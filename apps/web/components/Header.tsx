@@ -1,0 +1,53 @@
+"use client";
+
+import Link from "next/link";
+import dynamic from "next/dynamic";
+import { getChainMode } from "@/lib/chain/client";
+import { useViewer } from "@/lib/chain/hooks";
+import { shortAddress } from "@/lib/utils";
+
+// RainbowKit's ConnectButton only ships in genlayer mode (code-split).
+const ConnectButton = dynamic(
+  () => import("@rainbow-me/rainbowkit").then((m) => m.ConnectButton),
+  { ssr: false, loading: () => <div className="skeleton h-9 w-32" /> },
+);
+
+export function Header() {
+  const mode = getChainMode();
+  const { address } = useViewer();
+
+  return (
+    <header className="sticky top-0 z-40 border-b border-ink-line bg-ink/85 backdrop-blur-md">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4">
+        <Link href="/" className="display-statement text-xl text-paper hover:text-gold">
+          GRUDGE<span className="text-doubt">.</span>
+        </Link>
+        <nav className="hidden items-center gap-5 font-mono text-xs uppercase tracking-widest text-mut sm:flex">
+          <Link href="/" className="hover:text-paper">Ledger</Link>
+          <Link href="/leaderboards" className="hover:text-paper">Boards</Link>
+          <Link href={`/profile/${address}`} className="hover:text-paper">Record</Link>
+          <Link href="/dev/components" className="hover:text-paper">Gallery</Link>
+        </nav>
+        <div className="flex items-center gap-3">
+          <span className="hidden font-mono text-[10px] uppercase tracking-widest text-mut md:inline">⌘K</span>
+          <Link
+            href="/create"
+            className="rounded-control bg-gold px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-ink shadow-e1 transition-transform hover:bg-gold/90 active:scale-[0.97]"
+          >
+            Hold a grudge
+          </Link>
+          {mode === "genlayer" ? (
+            <ConnectButton showBalance={false} chainStatus="icon" accountStatus="address" />
+          ) : (
+            <span
+              title="Mock mode — set NEXT_PUBLIC_CHAIN_MODE=genlayer to use Testnet Bradbury"
+              className="rounded-control border border-dashed border-mut/50 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-mut"
+            >
+              {shortAddress(address)} · demo
+            </span>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}

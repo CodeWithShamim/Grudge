@@ -10,13 +10,15 @@ CONTRACT = grudge.py
 .PHONY: setup lint format test test-math test-bradbury deploy clean
 
 setup:
-	$(PY) -m pip install --quiet ruff mypy pytest gltest
+	$(PY) -m pip install --quiet ruff mypy pytest gltest genvm-linter pyright
 
 lint:
 	ruff check . --config pyproject.toml
 	ruff format --check .
 	MYPYPATH=stubs mypy $(CONTRACT) --strict --config-file pyproject.toml
 	$(PY) scripts/genvm_lint.py $(CONTRACT)
+	genvm-lint check $(CONTRACT) --json
+	genvm-lint typecheck $(CONTRACT) --json
 
 format:
 	ruff format .
@@ -31,11 +33,11 @@ test-math:
 # Pre-release verification target — Bradbury history resets periodically,
 # so this is NOT the CI default.
 test-bradbury:
-	gltest --network testnet-bradbury
+	gltest --network testnet_bradbury
 
 # Deploys to Bradbury and writes the address into the web app env + a record.
 deploy:
-	genlayer network testnet-bradbury
+	genlayer network testnet_bradbury
 	genlayer deploy --contract $(CONTRACT) | tee .deploy.log
 	$(PY) scripts/record_deploy.py .deploy.log
 

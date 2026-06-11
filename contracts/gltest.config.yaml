@@ -1,0 +1,18 @@
+# gltest configuration (https://docs.genlayer.com/api-references/genlayer-test)
+# Run from contracts/: `gltest --network studionet`
+
+networks:
+  default: studionet
+  # localnet/studionet work out of the box; Bradbury is defined explicitly so
+  # `gltest --network testnet_bradbury` works for pre-release verification.
+  # NOTE: Bradbury history resets periodically — verification target, not CI.
+  testnet_bradbury:
+    url: "https://rpc-bradbury.genlayer.com"
+    leader_only: false
+
+paths:
+  # grudge.py sits next to this file
+  contracts: "."
+  artifacts: "artifacts"
+
+environment: .env

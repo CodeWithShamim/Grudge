@@ -1,0 +1,87 @@
+"use client";
+
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { fadeRise, staggerList, receiptDeal } from "@/lib/motion/variants";
+import { useReducedMotionSafe } from "@/lib/motion/useReducedMotionSafe";
+import { useProfile } from "@/lib/chain/hooks";
+import { EMPTY_STATES } from "@/lib/psychology/copy";
+import { shortAddress } from "@/lib/utils";
+import { GenAmount } from "./ui/GenAmount";
+import { EmptyState } from "./ui/EmptyState";
+
+export function ProfileView({ address }: { address: string }) {
+  const { data: profile, isLoading } = useProfile(address);
+  const { pick } = useReducedMotionSafe();
+
+  if (isLoading || !profile) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-12">
+        <div className="skeleton mb-6 h-8 w-64" />
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <div key={i} className="skeleton h-24" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const stats = [
+    { label: "kept", value: profile.kept, cls: "text-believe" },
+    { label: "broken", value: profile.broken, cls: "text-doubt" },
+    { label: "streak", value: profile.currentStreak, cls: "text-gold" },
+  ];
+
+  return (
+    <motion.div variants={pick(staggerList)} initial="hidden" animate="visible" className="mx-auto max-w-3xl px-4 py-12">
+      <motion.header variants={pick(fadeRise)} className="mb-8">
+        <p className="font-mono text-xs uppercase tracking-widest text-mut">the record of</p>
+        <h1 className="display-statement text-display-lg text-paper">{shortAddress(address)}</h1>
+      </motion.header>
+
+      <motion.div variants={pick(fadeRise)} className="mb-12 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {stats.map((s) => (
+          <div key={s.label} className="grain relative rounded-card bg-ink-soft p-4 text-center shadow-e1">
+            <p className={`font-mono text-3xl font-bold tabular-nums ${s.cls}`}>{s.value}</p>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-mut">{s.label}</p>
+          </div>
+        ))}
+        <div className="grain relative rounded-card bg-ink-soft p-4 text-center shadow-e1">
+          <GenAmount value={profile.earnings} className="text-2xl font-bold text-gold" suffix="" />
+          <p className="font-mono text-[10px] uppercase tracking-widest text-mut">GEN earned</p>
+        </div>
+      </motion.div>
+
+      <motion.section variants={pick(fadeRise)}>
+        <h2 className="mb-4 font-mono text-xs uppercase tracking-[0.25em] text-mut">
+          &ldquo;Called it&rdquo; receipts · {profile.calledItReceipts.length}
+        </h2>
+        {profile.calledItReceipts.length === 0 ? (
+          <EmptyState line={EMPTY_STATES.receipts} />
+        ) : (
+          <div className="flex flex-wrap gap-4">
+            {profile.calledItReceipts.map((r, i) => (
+              <motion.div
+                key={`${r.challengeId}-${i}`}
+                custom={i}
+                variants={pick(receiptDeal)}
+                className="grain relative w-52 rounded-card bg-paper p-4 text-ink shadow-e3"
+              >
+                <p className="font-display text-xl uppercase italic leading-none">Called it</p>
+                <Link href={`/challenge/${r.challengeId}`} className="mt-2 block truncate text-xs hover:underline">
+                  &ldquo;{r.statement}&rdquo;
+                </Link>
+                <div className="mt-2 flex justify-between font-mono text-xs tabular-nums">
+                  <span>staked {Math.round(r.amount)}</span>
+                  <span className="font-bold">won {Math.round(r.winnings)}</span>
+                </div>
+                <div className="perforation mt-3 h-2 w-full opacity-40" aria-hidden />
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </motion.section>
+    </motion.div>
+  );
+}

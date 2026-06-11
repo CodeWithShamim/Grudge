@@ -1,0 +1,6 @@
+{
+  "stubPath": "contracts/stubs",
+  "extraPaths": ["contracts/stubs"],
+  "reportMissingModuleSource": false,
+  "exclude": ["**/node_modules", "**/.venv", "**/.next"]
+}

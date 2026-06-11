@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  web:
+    name: Web (typecheck, lint, unit, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+        env:
+          NEXT_PUBLIC_CHAIN_MODE: mock
+      # Lighthouse budget check (challenge page) — runs against the prod build
+      - name: Lighthouse budgets
+        run: |
+          pnpm --filter @grudge/web exec sh -c "npx --yes start-server-and-test 'next start -p 3100' http://localhost:3100/challenge/1 'npx --yes @lhci/cli@0.14.x autorun --collect.url=http://localhost:3100/challenge/1 --collect.numberOfRuns=1 --collect.settings.preset=desktop --assert.assertions.largest-contentful-paint=error:2000 --assert.assertions.cumulative-layout-shift=error:0.02 --assert.assertions.total-blocking-time=error:200'"
+        continue-on-error: true # budget is tracked; flaky CI hardware must not block merges silently — see job summary
+
+  contracts:
+    name: Contracts (ruff, mypy, genvm_lint, gltest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet ruff mypy pytest genvm-linter pyright
+      - run: ruff check . --config pyproject.toml
+      - run: ruff format --check .
+      - run: MYPYPATH=stubs mypy grudge.py --strict --config-file pyproject.toml
+      - run: python scripts/genvm_lint.py grudge.py
+      # official GenLayer linter: AST safety checks + SDK semantic validation + pyright
+      - run: genvm-lint check grudge.py --json
+      - run: genvm-lint typecheck grudge.py --json
+      - run: python -m pytest tests/test_settle_math.py -q
+      # gltest needs a reachable GenLayer Studio; provide STUDIO_URL secret to enable
+      - name: gltest vs studionet
+        if: ${{ vars.GLTEST_ENABLED == 'true' }}
+        run: |
+          pip install --quiet gltest
+          gltest --network studionet
+
+  e2e:
+    name: E2E (Playwright, mock mode)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @grudge/web exec playwright install --with-deps chromium
+      - run: pnpm e2e
+        env:
+          NEXT_PUBLIC_CHAIN_MODE: mock

@@ -1,0 +1,71 @@
+# ── dependencies ─────────────────────────────────────────────────────────────
+node_modules/
+.pnpm-store/
+.pnp.*
+
+# ── next.js / web build ──────────────────────────────────────────────────────
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+.vercel/
+.turbo/
+
+# ── env & secrets (templates like .env.example are deliberately ignored too) ─
+.env
+.env.local
+.env*.local
+.env.development
+.env.production
+.env.example
+*.pem
+*.key
+
+# ── tests & reports ──────────────────────────────────────────────────────────
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.lighthouseci/
+.nyc_output/
+
+# ── python / contracts toolchain ─────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.pyright/
+
+# ── genlayer artifacts ───────────────────────────────────────────────────────
+contracts/artifacts/
+contracts/.deploy.log
+.genlayer/
+
+# ── editors & IDEs ───────────────────────────────────────────────────────────
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# ── OS junk ──────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+Desktop.ini
+
+# ── logs & scratch ───────────────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+pnpm-debug.log*
+*.tmp
+*.tmp.*
+shot.tmp.mjs
+probe.tmp.mjs

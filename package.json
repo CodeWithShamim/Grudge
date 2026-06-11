@@ -1,0 +1,34 @@
+{
+  "name": "grudge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GRUDGE — your friends bet you'll fail. A social accountability game refereed by GenLayer Intelligent Contracts.",
+  "scripts": {
+    "dev": "pnpm --filter @grudge/web dev",
+    "build": "pnpm --filter @grudge/web build",
+    "start": "pnpm --filter @grudge/web start",
+    "lint": "pnpm --filter @grudge/web lint",
+    "typecheck": "pnpm --filter @grudge/web typecheck",
+    "test": "pnpm --filter @grudge/web test",
+    "e2e": "pnpm --filter @grudge/web e2e",
+    "contracts:lint": "make -C contracts lint",
+    "contracts:test": "make -C contracts test",
+    "prepare": "husky || true"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "unrs-resolver",
+      "@prisma/client",
+      "prisma"
+    ]
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.18.2"
+}

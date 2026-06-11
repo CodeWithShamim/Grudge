@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    @apply bg-ink text-paper antialiased;
+  }
+  body {
+    @apply font-sans;
+  }
+  /* Tabular numerals on ALL numbers, per design spec */
+  body {
+    font-variant-numeric: tabular-nums;
+  }
+  ::selection {
+    @apply bg-gold text-ink;
+  }
+  /* Focus visibility: high-contrast gold ring, never removed */
+  :focus-visible {
+    outline: 2px solid #ffc24b;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Condensed uppercase display statements */
+  .display-statement {
+    @apply font-display uppercase italic tracking-tight;
+  }
+
+  /* 4% film-grain/noise overlay for ink surfaces */
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    border-radius: inherit;
+  }
+
+  /* Diagonal stripes that drift continuously (GPU-only background-position) */
+  .stripes-believe {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      rgba(25, 195, 125, 0.25) 0 10px,
+      rgba(25, 195, 125, 0.08) 10px 20px
+    );
+    background-size: 28px 28px;
+  }
+  .stripes-doubt {
+    background-image: repeating-linear-gradient(
+      45deg,
+      rgba(255, 77, 77, 0.25) 0 10px,
+      rgba(255, 77, 77, 0.08) 10px 20px
+    );
+    background-size: 28px 28px;
+  }
+
+  /* Skeleton shimmer — shaped by the consumer, never a bare gray box */
+  .skeleton {
+    @apply rounded-control bg-ink-raised;
+    background-image: linear-gradient(
+      100deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.06) 50%,
+      transparent 70%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
+
+  /* Ticket perforation edge */
+  .perforation {
+    background-image: radial-gradient(circle at 8px 50%, #101216 5px, transparent 5.5px);
+    background-size: 24px 100%;
+    background-repeat: repeat-x;
+  }
+
+  /* Pending (optimistic) treatment: dashed border + clock glyph supplied by component */
+  .pending-tx {
+    @apply border border-dashed border-mut/60 opacity-80;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-stripe-drift,
+  .animate-breathe,
+  .animate-shimmer,
+  .animate-caret {
+    animation: none !important;
+  }
+}

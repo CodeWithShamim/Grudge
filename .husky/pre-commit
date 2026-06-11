@@ -1,0 +1,1 @@
+pnpm --filter @grudge/web lint && pnpm --filter @grudge/web typecheck
