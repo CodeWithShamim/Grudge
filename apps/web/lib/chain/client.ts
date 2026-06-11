@@ -40,6 +40,11 @@ export interface GrudgeClient {
 
   settle(id: string): Promise<SettleResult>;
 
+  /** Winnings credited by settle() and not yet withdrawn, in GEN. */
+  getClaimable(address: string): Promise<number>;
+  /** Withdraw the caller's settled winnings. Rejects when nothing is claimable. */
+  claim(from: string): Promise<{ txHash: string; amount: number }>;
+
   getProfile(address: string): Promise<Profile>;
   getLeaderboards(): Promise<Leaderboards>;
 }

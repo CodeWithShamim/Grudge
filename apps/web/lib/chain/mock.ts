@@ -212,6 +212,8 @@ export function seedChallenges(now: number): Challenge[] {
 interface MockStore {
   challenges: Map<string, Challenge>;
   nextId: number;
+  /** Settled-but-unclaimed winnings per address, in GEN (mirrors the contract's claimable ledger). */
+  claimable: Map<string, number>;
 }
 
 function createStore(): MockStore {
@@ -220,6 +222,7 @@ function createStore(): MockStore {
   return {
     challenges: new Map(list.map((c) => [c.id, c])),
     nextId: list.length + 1,
+    claimable: new Map(),
   };
 }
 
@@ -339,6 +342,7 @@ export function createMockGrudgeClient(): GrudgeClient {
       const c = must(id);
       if (c.creator.toLowerCase() !== from.toLowerCase()) throw new Error("Only the challenger submits evidence.");
       if (c.status !== "ACTIVE") throw new Error("This grudge is closed.");
+      if (Date.now() >= c.endsAt) throw new Error("Deadline passed — settle the challenge.");
       // Latency here is intentional: the validator-arc animation plays over it.
       await delay(900);
       const result = (await remoteJudge("evidence", {
@@ -409,12 +413,32 @@ export function createMockGrudgeClient(): GrudgeClient {
               amount: c.doubterPool > 0 ? (s.amount / c.doubterPool) * distributable + s.amount : 0,
             }));
       c.status = "SETTLED";
+      // Credit winnings to the claimable ledger — like the contract, settle
+      // never transfers directly; winners withdraw via claim().
+      for (const w of winners) {
+        const key = w.address.toLowerCase();
+        store.claimable.set(key, (store.claimable.get(key) ?? 0) + w.amount);
+      }
       return {
         txHash: fakeTxHash(),
         outcome: succeeded ? "SUCCEEDED" : "FAILED",
         payouts: winners.map((w) => ({ ...w, amount: Math.round(w.amount * 100) / 100 })),
         rake: Math.round(rake * 100) / 100,
       };
+    },
+
+    async getClaimable(address: string): Promise<number> {
+      await delay(120);
+      return store.claimable.get(address.toLowerCase()) ?? 0;
+    },
+
+    async claim(from: string): Promise<{ txHash: string; amount: number }> {
+      await delay(600);
+      const key = from.toLowerCase();
+      const amount = store.claimable.get(key) ?? 0;
+      if (amount <= 0) throw new Error("Nothing to claim for this wallet.");
+      store.claimable.set(key, 0);
+      return { txHash: fakeTxHash(), amount: Math.round(amount * 100) / 100 };
     },
 
     async getProfile(address: string): Promise<Profile> {

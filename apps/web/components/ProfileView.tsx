@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { fadeRise, staggerList, receiptDeal } from "@/lib/motion/variants";
 import { useReducedMotionSafe } from "@/lib/motion/useReducedMotionSafe";
-import { useProfile } from "@/lib/chain/hooks";
+import { useClaim, useClaimable, useProfile, useViewer } from "@/lib/chain/hooks";
 import { EMPTY_STATES } from "@/lib/psychology/copy";
 import { shortAddress } from "@/lib/utils";
 import { GenAmount } from "./ui/GenAmount";
@@ -12,6 +12,10 @@ import { EmptyState } from "./ui/EmptyState";
 
 export function ProfileView({ address }: { address: string }) {
   const { data: profile, isLoading } = useProfile(address);
+  const { address: viewer } = useViewer();
+  const isOwn = viewer.toLowerCase() === address.toLowerCase();
+  const { data: claimable = 0 } = useClaimable(address);
+  const claim = useClaim();
   const { pick } = useReducedMotionSafe();
 
   if (isLoading || !profile) {
@@ -52,6 +56,28 @@ export function ProfileView({ address }: { address: string }) {
           <p className="font-mono text-[10px] uppercase tracking-widest text-mut">GEN earned</p>
         </div>
       </motion.div>
+
+      {isOwn && claimable > 0 && (
+        <motion.div
+          variants={pick(fadeRise)}
+          className="grain relative mb-12 flex items-center justify-between gap-4 rounded-card bg-ink-soft p-4 shadow-e1"
+        >
+          <div>
+            <GenAmount value={claimable} className="text-xl font-bold text-gold" suffix="" />
+            <p className="font-mono text-[10px] uppercase tracking-widest text-mut">
+              GEN waiting to be claimed
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => claim.mutate()}
+            disabled={claim.isPending}
+            className="rounded-card bg-gold px-5 py-2 font-mono text-xs font-bold uppercase tracking-widest text-ink transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {claim.isPending ? "claiming…" : "claim it"}
+          </button>
+        </motion.div>
+      )}
 
       <motion.section variants={pick(fadeRise)}>
         <h2 className="mb-4 font-mono text-xs uppercase tracking-[0.25em] text-mut">

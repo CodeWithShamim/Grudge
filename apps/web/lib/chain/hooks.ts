@@ -19,6 +19,7 @@ export const qk = {
   open: ["challenges", "open"] as const,
   profile: (address: string) => ["profile", address] as const,
   leaderboards: ["leaderboards"] as const,
+  claimable: (address: string) => ["claimable", address] as const,
 };
 
 /** The acting identity: connected wallet, or the demo identity in mock mode. */
@@ -156,6 +157,33 @@ export function useSettle(challengeId: string) {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: qk.challenge(challengeId) });
       void qc.invalidateQueries({ queryKey: qk.open });
+      // settle credits the winners' claimable ledgers
+      void qc.invalidateQueries({ queryKey: ["claimable"] });
+    },
+  });
+}
+
+/** Settled-but-unclaimed winnings for an address, in GEN. */
+export function useClaimable(address: string) {
+  return useQuery({
+    queryKey: qk.claimable(address),
+    queryFn: async () => (await getGrudgeClient()).getClaimable(address),
+    refetchInterval: 20_000,
+  });
+}
+
+export function useClaim() {
+  const qc = useQueryClient();
+  const { address } = useViewer();
+  return useMutation({
+    mutationFn: async () => (await getGrudgeClient()).claim(address),
+    onSuccess: ({ txHash, amount }) => {
+      txToast(`Claimed ${amount} GEN. Spend it loudly.`, txHash);
+    },
+    onError: (e) => toast.error("Claim failed", { description: e.message }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: qk.claimable(address) });
+      void qc.invalidateQueries({ queryKey: qk.profile(address) });
     },
   });
 }

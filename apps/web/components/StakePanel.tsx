@@ -11,8 +11,8 @@ import { MIN_STAKE_GEN, type Challenge, type Side } from "@/lib/chain/types";
 import { Button } from "./ui/Button";
 import { Modal } from "./ui/Modal";
 
-// testnet-friendly: smallest preset is the 0.5 GEN minimum
-const PRESETS = [0.5, 1, 5, 25];
+// testnet-friendly: smallest preset is the MIN_STAKE_GEN minimum
+const PRESETS = [MIN_STAKE_GEN, 1, 5, 25];
 
 /**
  * Stake modal + signature moment #5: on confirm, the staked amount detaches
@@ -110,7 +110,7 @@ export function StakePanel({
                 placeholder={`min ${MIN_STAKE_GEN}`}
                 value={custom}
                 onChange={(e) => {
-                  // digits + a single decimal point (0.5 GEN minimum stake)
+                  // digits + a single decimal point (MIN_STAKE_GEN minimum)
                   const cleaned = e.target.value.replace(/[^0-9.]/g, "");
                   const firstDot = cleaned.indexOf(".");
                   setCustom(

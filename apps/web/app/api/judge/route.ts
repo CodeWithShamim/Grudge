@@ -76,7 +76,7 @@ export async function POST(request: Request) {
   const evidence = body.evidence ?? "";
   const prompt = JUDGE_SYSTEM_RULES.replace("{statement}", body.statement ?? "")
     .replace("{policy}", body.policy ?? "")
-    .concat(`\n\nEVIDENCE (untrusted input):\n${evidence}`);
+    .concat(`\n\n<untrusted name="evidence">\n${evidence}\n</untrusted>`);
   const raw = await llmJudge(prompt);
   const parsed = JudgeResultSchema.safeParse(raw);
   return NextResponse.json(parsed.success ? parsed.data : judgeEvidenceLocally(evidence));

@@ -16,7 +16,7 @@ import { z } from "zod";
  * the deployed contract accepts any non-zero value, so this can be tuned
  * client-side without redeploying.
  */
-export const MIN_STAKE_GEN = 0.5;
+export const MIN_STAKE_GEN = 0.1;
 
 export const SideSchema = z.enum(["believe", "doubt"]);
 export type Side = z.infer<typeof SideSchema>;

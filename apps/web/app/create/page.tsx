@@ -14,6 +14,21 @@ import { Button } from "@/components/ui/Button";
 
 const CATEGORIES = ["fitness", "habits", "career", "creator", "money", "general"] as const;
 
+/**
+ * Every new ledger starts pre-filled with a statement/policy that passes the
+ * on-chain screening (concrete, measurable, time-boxed) — edit, screen, go.
+ * A blank or vague start gets rejected by the validators with
+ * "vague, not measurable".
+ */
+const DEFAULTS = {
+  statement: "I will run at least 3 kilometers every day for 30 consecutive days.",
+  policy: "Strava activity link or screenshot each day showing the date and distance ≥ 3.0 km.",
+  category: "fitness",
+  durationDays: 30,
+  requiredProofs: 24,
+  selfStake: 1,
+} as const;
+
 const StepOneSchema = z.string().min(12, "Too short to be a real promise.");
 
 export default function CreatePage() {
@@ -23,14 +38,14 @@ export default function CreatePage() {
 
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState<1 | -1>(1);
-  const [statement, setStatement] = useState("");
+  const [statement, setStatement] = useState<string>(DEFAULTS.statement);
   const [screening, setScreening] = useState<Screening | null>(null);
   const [screeningPending, setScreeningPending] = useState(false);
-  const [policy, setPolicy] = useState("");
-  const [category, setCategory] = useState<string>("habits");
-  const [durationDays, setDurationDays] = useState(30);
-  const [requiredProofs, setRequiredProofs] = useState(24);
-  const [selfStake, setSelfStake] = useState(1);
+  const [policy, setPolicy] = useState<string>(DEFAULTS.policy);
+  const [category, setCategory] = useState<string>(DEFAULTS.category);
+  const [durationDays, setDurationDays] = useState<number>(DEFAULTS.durationDays);
+  const [requiredProofs, setRequiredProofs] = useState<number>(DEFAULTS.requiredProofs);
+  const [selfStake, setSelfStake] = useState<number>(DEFAULTS.selfStake);
 
   const go = (next: number) => {
     setDirection(next > step ? 1 : -1);
@@ -180,12 +195,12 @@ export default function CreatePage() {
         {step === 2 && (
           <motion.section key="s2" variants={variants} initial="enter" animate="center" exit="exit" className="space-y-6">
             <NumberField
-              label="Your self-stake (GEN) — you lose it if you fold (min 0.5)"
+              label={`Your self-stake (GEN) — you lose it if you fold (min ${MIN_STAKE_GEN})`}
               value={selfStake}
               onChange={setSelfStake}
               min={MIN_STAKE_GEN}
               max={100000}
-              step={0.5}
+              step={0.1}
             />
             <div className="grain relative rounded-card bg-ink-soft p-5 shadow-e2">
               <p className="font-mono text-[10px] uppercase tracking-widest text-mut">the ticket you&apos;re signing</p>

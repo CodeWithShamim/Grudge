@@ -22,13 +22,13 @@ describe("mock GrudgeClient — contract-faithful behavior", () => {
     expect(after.believerPool).toBe(before.believerPool);
   });
 
-  it("enforces the 0.5 GEN minimum stake", async () => {
+  it("enforces the 0.1 GEN minimum stake", async () => {
     const client = createMockGrudgeClient();
-    await expect(client.stake("6", "believe", 0.4, "0xTiny")).rejects.toThrow(/minimum stake/i);
+    await expect(client.stake("6", "believe", 0.05, "0xTiny")).rejects.toThrow(/minimum stake/i);
     const before = await client.getChallenge("6");
-    await client.stake("6", "believe", 0.5, "0xTiny");
+    await client.stake("6", "believe", 0.1, "0xTiny");
     const after = await client.getChallenge("6");
-    expect(after.believerPool).toBeCloseTo(before.believerPool + 0.5, 5);
+    expect(after.believerPool).toBeCloseTo(before.believerPool + 0.1, 5);
   });
 
   it("creator cannot doubt themselves", async () => {
@@ -92,6 +92,23 @@ describe("mock GrudgeClient — contract-faithful behavior", () => {
     const client = createMockGrudgeClient();
     await client.settle("4");
     await expect(client.settle("4")).rejects.toThrow(/Already settled/i);
+  });
+
+  it("settle credits the claimable ledger; claim withdraws it once", async () => {
+    const client = createMockGrudgeClient();
+    const result = await client.settle("4");
+    const winner = result.payouts[0]!;
+    const claimable = await client.getClaimable(winner.address);
+    expect(claimable).toBeCloseTo(winner.amount, 1);
+    const { amount } = await client.claim(winner.address);
+    expect(amount).toBeCloseTo(winner.amount, 1);
+    expect(await client.getClaimable(winner.address)).toBe(0);
+    await expect(client.claim(winner.address)).rejects.toThrow(/nothing to claim/i);
+  });
+
+  it("claim with no winnings reverts", async () => {
+    const client = createMockGrudgeClient();
+    await expect(client.claim("0xNobody")).rejects.toThrow(/nothing to claim/i);
   });
 
   it("create rejects vague statements", async () => {

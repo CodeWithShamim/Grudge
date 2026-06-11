@@ -23,10 +23,10 @@ test("challenge page: stake as a doubter with a taunt", async ({ page }) => {
   await page.getByRole("button", { name: /doubt them/i }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByRole("radio", { name: /they'll fold/i }).click();
-  // smallest preset is the 0.5 GEN minimum
-  await page.getByRole("button", { name: "0.5", exact: true }).click();
+  // smallest preset is the 0.1 GEN minimum
+  await page.getByRole("button", { name: "0.1", exact: true }).click();
   await page.getByPlaceholder(/say it to their face/i).fill("Day 9. Always day 9.");
-  await page.getByRole("button", { name: /bet 0.5 gen they fail/i }).click();
+  await page.getByRole("button", { name: /bet 0.1 gen they fail/i }).click();
 
   // optimistic update + toast
   await expect(page.getByText(/doubt recorded/i)).toBeVisible({ timeout: 15_000 });

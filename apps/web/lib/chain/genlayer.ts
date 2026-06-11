@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { GrudgeClient } from "./client";
 import { getBradburyEnv } from "./bradbury";
+import { friendlyError } from "./errors";
 import {
   ChallengeSchema,
   ScreeningSchema,
@@ -18,9 +19,9 @@ import {
 /**
  * genlayer-js adapter against Testnet Bradbury.
  *
- * This is the ONLY file that touches genlayer-js. The wallet account comes
- * from the injected EIP-1193 provider that RainbowKit/wagmi connected —
- * keys never leave the wallet; genlayer-js signs through the provider.
+ * This is the ONLY file that touches genlayer-js. Writes sign through the
+ * wagmi wallet client of the connector RainbowKit connected — keys never
+ * leave the wallet; genlayer-js signs through that single provider.
  */
 
 const GEN_DECIMALS = 18n;
@@ -122,7 +123,12 @@ type GenLayerSdkClient = {
     args: unknown[];
     value: bigint;
   }): Promise<unknown>;
-  waitForTransactionReceipt(args: { hash: `0x${string}`; status?: string; retries?: number }): Promise<unknown>;
+  waitForTransactionReceipt(args: {
+    hash: `0x${string}`;
+    status?: string;
+    interval?: number;
+    retries?: number;
+  }): Promise<unknown>;
 };
 
 async function buildChain(): Promise<Record<string, unknown>> {
@@ -153,44 +159,33 @@ async function makeReadClient(): Promise<GenLayerSdkClient> {
   return client as unknown as GenLayerSdkClient;
 }
 
-type Eip1193Provider = { request(args: { method: string; params?: unknown }): Promise<unknown> };
-
 /**
- * Write client — signs through the ACTIVE RainbowKit/wagmi connector.
- * Every writeTx resolves the connected account + its EIP-1193 provider from
- * the wagmi config (works for injected, WalletConnect, Coinbase, …);
- * `window.ethereum` is only a last-resort fallback.
+ * Write client — signs through ONE provider: the wagmi wallet client of the
+ * ACTIVE RainbowKit connector (injected, WalletConnect, Coinbase, …), the
+ * same single provider path proven on the arbiq deployment. No
+ * `window.ethereum` fallback — a blind grab can sign with a different wallet
+ * than the one the user connected.
  */
 async function makeWriteClient(): Promise<GenLayerSdkClient> {
-  let account: string | undefined;
-  let provider: Eip1193Provider | undefined;
-
   const { getWagmiConfig } = await import("./wagmiBridge");
   const config = getWagmiConfig();
-  if (config) {
-    const { getAccount } = await import("wagmi/actions");
-    const current = getAccount(config);
-    if (!current.isConnected || !current.address || !current.connector) {
-      throw new Error("No wallet connected. Use Connect Wallet in the header first.");
-    }
-    account = current.address;
-    provider = (await current.connector.getProvider()) as Eip1193Provider;
-  } else {
-    // mock->genlayer edge cases / tests: fall back to the injected provider
-    const eth = (globalThis as { ethereum?: Eip1193Provider }).ethereum;
-    if (!eth) throw new Error("No wallet available. Connect a wallet first.");
-    const accounts = (await eth.request({ method: "eth_requestAccounts" })) as string[];
-    account = accounts[0];
-    provider = eth;
+  if (!config) {
+    throw new Error("No wallet connected. Use Connect Wallet in the header first.");
   }
-  if (!account || !provider) throw new Error("Wallet returned no account. Connect a wallet first.");
+
+  const { getAccount, getWalletClient } = await import("wagmi/actions");
+  const current = getAccount(config);
+  if (!current.isConnected || !current.address) {
+    throw new Error("No wallet connected. Use Connect Wallet in the header first.");
+  }
+  const walletClient = await getWalletClient(config);
 
   const { createClient } = await import("genlayer-js");
   const chain = await buildChain();
   const client = createClient({
     chain,
-    account: account as `0x${string}`,
-    provider,
+    account: current.address,
+    provider: walletClient,
   } as unknown as Parameters<typeof createClient>[0]);
   return client as unknown as GenLayerSdkClient;
 }
@@ -201,13 +196,142 @@ function readSdk(): Promise<GenLayerSdkClient> {
   return readPromise;
 }
 
+// ── read layer: cache + in-flight dedup + concurrency limit + backoff ──
+// Bradbury rate-limits gen_call, so raw per-component reads cause 429 storms.
+// (Pattern proven in production on the arbiq deployment.)
+
+const readCache = new Map<string, { result: unknown; ts: number }>();
+const READ_CACHE_TTL = 15_000; // ms
+
+// Multiple components reading the same key at the same moment share ONE
+// in-flight promise instead of each firing their own gen_call.
+const inFlight = new Map<string, Promise<unknown>>();
+
+// At most 2 simultaneous RPC reads.
+const MAX_CONCURRENT = 2;
+let active = 0;
+const slotQueue: Array<() => void> = [];
+
+function acquireSlot(): Promise<void> {
+  if (active < MAX_CONCURRENT) {
+    active++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => slotQueue.push(resolve));
+}
+
+function releaseSlot(): void {
+  const next = slotQueue.shift();
+  if (next) next();
+  else active--;
+}
+
+function isRateLimit(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /rate limit|429|too many requests/i.test(msg);
+}
+
+// One concurrency slot is acquired and released exactly once per attempt.
+async function fetchOnce(functionName: string, args: unknown[]): Promise<unknown> {
+  await acquireSlot();
+  try {
+    const client = await readSdk();
+    return await client.readContract({ address: contractAddress(), functionName, args });
+  } finally {
+    releaseSlot();
+  }
+}
+
+// Backoff happens OUTSIDE the slot so a rate-limited read doesn't hold a
+// slot while it sleeps — that would starve the limiter and worsen the storm.
+async function fetchWithRetry(functionName: string, args: unknown[], attempt = 0): Promise<unknown> {
+  try {
+    return await fetchOnce(functionName, args);
+  } catch (err) {
+    if (isRateLimit(err) && attempt < 5) {
+      // 800ms, 1.6s, 3.2s, 6.4s, 12.8s + jitter to de-sync clients
+      const delay = 800 * 2 ** attempt + Math.random() * 400;
+      await new Promise((r) => setTimeout(r, delay));
+      return fetchWithRetry(functionName, args, attempt + 1);
+    }
+    throw err;
+  }
+}
+
+async function readRaw(functionName: string, args: unknown[]): Promise<unknown> {
+  const key = functionName + JSON.stringify(args);
+
+  const cached = readCache.get(key);
+  if (cached && Date.now() - cached.ts < READ_CACHE_TTL) return cached.result;
+
+  const existing = inFlight.get(key);
+  if (existing) return existing;
+
+  const promise = fetchWithRetry(functionName, args)
+    .then((result) => {
+      readCache.set(key, { result, ts: Date.now() });
+      inFlight.delete(key);
+      return result;
+    })
+    .catch((err: unknown) => {
+      inFlight.delete(key);
+      throw err;
+    });
+
+  inFlight.set(key, promise);
+  return promise;
+}
+
+/**
+ * Make sure the CONNECTED wallet is on Bradbury before signing.
+ *
+ * Never use genlayer-js's client.connect() here: it talks to window.ethereum
+ * directly, so with several wallet extensions installed it opens the wrong
+ * one (e.g. MetaMask while Keplr is the connected wallet). wagmi's
+ * switchChain routes the switch/add request through the ACTIVE connector —
+ * the same wallet that will sign the tx.
+ */
+async function ensureBradburyChain(): Promise<void> {
+  const { getWagmiConfig } = await import("./wagmiBridge");
+  const config = getWagmiConfig();
+  const env = getBradburyEnv();
+  if (!config || !env) return;
+
+  const { getAccount, switchChain } = await import("wagmi/actions");
+  const current = getAccount(config);
+  if (!current.isConnected || current.chainId === env.chainId) return;
+
+  try {
+    await switchChain(config, { chainId: env.chainId });
+  } catch (e) {
+    throw new Error(
+      `Switch your wallet to GenLayer Testnet Bradbury to continue (${e instanceof Error ? e.message : "switch rejected"})`,
+    );
+  }
+}
+
 // The write client is rebuilt per call: the connected account can change.
 async function write(functionName: string, args: unknown[], value = 0n): Promise<TxResult> {
-  const client = await makeWriteClient();
-  const hash = await client.writeContract({ address: contractAddress(), functionName, args, value });
-  const txHash = typeof hash === "string" ? hash : String(hash);
-  await client.waitForTransactionReceipt({ hash: txHash as `0x${string}`, status: "FINALIZED", retries: 60 });
-  return { txHash };
+  try {
+    await ensureBradburyChain();
+    const client = await makeWriteClient();
+
+    const hash = await client.writeContract({ address: contractAddress(), functionName, args, value });
+    const txHash = typeof hash === "string" ? hash : String(hash);
+    // ACCEPTED is the right UX gate (gltest's default too); FINALIZED can take
+    // the full consensus window on a public testnet and looks like a hang.
+    await client.waitForTransactionReceipt({
+      hash: txHash as `0x${string}`,
+      status: "ACCEPTED",
+      interval: 3_000,
+      retries: 60,
+    });
+    // State changed on-chain — stale cached reads would mask the write.
+    readCache.clear();
+    return { txHash };
+  } catch (err) {
+    throw new Error(friendlyError(err), { cause: err });
+  }
 }
 
 async function readJson<S extends z.ZodTypeAny>(
@@ -215,16 +339,43 @@ async function readJson<S extends z.ZodTypeAny>(
   args: unknown[],
   schema: S,
 ): Promise<z.output<S>> {
-  const client = await readSdk();
-  const raw = await client.readContract({ address: contractAddress(), functionName, args });
+  const raw = await readRaw(functionName, args);
   const text = typeof raw === "string" ? raw : JSON.stringify(raw);
   return schema.parse(JSON.parse(text)) as z.output<S>;
 }
 
+const PAGE_LIMIT = 50;
+
+const ChallengesPageSchema = z.object({
+  total: z.number(),
+  offset: z.number(),
+  limit: z.number(),
+  challenges: z.array(RawChallengeSchema),
+});
+
+/** Page through get_challenges_page so no single gen_call is unbounded. */
+async function fetchAllPaged(): Promise<z.infer<typeof RawChallengeSchema>[]> {
+  const out: z.infer<typeof RawChallengeSchema>[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await readJson("get_challenges_page", [offset, PAGE_LIMIT], ChallengesPageSchema);
+    out.push(...page.challenges);
+    offset += PAGE_LIMIT;
+    if (page.challenges.length === 0 || out.length >= page.total) break;
+  }
+  return out;
+}
+
 export function createGenLayerGrudgeClient(): GrudgeClient {
   const getAll = async (): Promise<Challenge[]> => {
-    const raws = await readJson("get_open_challenges", [], z.array(RawChallengeSchema));
-    return raws.map(adaptChallenge);
+    try {
+      return (await fetchAllPaged()).map(adaptChallenge);
+    } catch {
+      // A contract deployed before get_challenges_page existed: fall back to
+      // the legacy unbounded view (same data, one call).
+      const raws = await readJson("get_open_challenges", [], z.array(RawChallengeSchema));
+      return raws.map(adaptChallenge);
+    }
   };
 
   return {
@@ -290,6 +441,21 @@ export function createGenLayerGrudgeClient(): GrudgeClient {
         payouts: [],
         rake: 0,
       };
+    },
+
+    async getClaimable(address: string): Promise<number> {
+      // get_claimable returns a bare integer string in wei-style units; parse
+      // through BigInt (JSON.parse would lose precision past 2^53).
+      const raw = await readRaw("get_claimable", [address]);
+      return fromUnits(BigInt(String(raw).trim()));
+    },
+
+    async claim(_from: string): Promise<{ txHash: string; amount: number }> {
+      // The wallet is the caller on-chain; read the amount first since the
+      // contract zeroes the ledger before transferring.
+      const amount = await this.getClaimable(_from);
+      const { txHash } = await write("claim", []);
+      return { txHash, amount };
     },
 
     async getProfile(address: string): Promise<Profile> {
