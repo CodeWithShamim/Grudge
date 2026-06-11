@@ -1,0 +1,6 @@
+{
+  "stubPath": "stubs",
+  "extraPaths": ["stubs"],
+  "reportMissingModuleSource": false,
+  "exclude": [".venv"]
+}

@@ -1,0 +1,49 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["ALL"]
+# Each ignore is documented — GenVM contracts are not ordinary Python modules.
+ignore = [
+  "D",       # docstring style — GenVM contracts use module docs, not Google style
+  "ANN401",  # typing.Any is required for parsed LLM JSON payloads
+  "TRY002",  # GenVM reverts use bare Exception by convention
+  "TRY003",  # revert reasons are long literal messages by design
+  "EM101",   # ditto: string literals directly in raised exceptions
+  "EM102",   # ditto with f-strings
+  "F403",    # `from genlayer import *` is the documented GenVM header pattern
+  "F405",    # names provided by the GenVM star import
+  "PLR0913", # contract entrypoints mirror the public ABI; arg count is the ABI
+  "PLR2004", # numeric guards (12, 280, 365…) read clearer inline in revert checks
+  "C901",    # settle() is long because payout math must stay in one place
+  "PLR0912",
+  "S101",    # pytest assertions
+  "INP001",  # contracts/ is not a package
+  "T201",    # scripts print to stdout by design
+  "DTZ005",  # GenVM message.datetime is consensus time, tz handled by runtime
+  "ERA001",  # commented examples in prompts
+  "E501",    # prompt literals exceed line length
+  "COM812",  # conflicts with ruff format
+  "UP017",   # keep datetime.timezone.utc — the exact spelling in GenLayer docs,
+             # safe on every GenVM runner regardless of its CPython minor
+
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S", "PLR", "ANN", "SLF001", "ARG001", "FBT", "PT011"]
+"scripts/*" = ["S", "PLR", "ANN", "PTH", "BLE001"]
+# stubs mirror the GenVM runtime API exactly (lowercase u32/u64/u256, old-style
+# generics for py-genlayer compatibility) — naming/PYI modernization rules off
+"stubs/*" = ["N801", "PYI034", "UP046", "UP047", "UP037", "PYI020", "ANN", "A002"]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "stubs"
+strict = true
+# the GenVM runtime provides `genlayer` at execution time; stubs cover the API
+ignore_missing_imports = false
+
+[[tool.mypy.overrides]]
+module = "gltest.*"
+ignore_missing_imports = true
