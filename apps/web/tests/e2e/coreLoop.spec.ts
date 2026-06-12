@@ -32,6 +32,23 @@ test("challenge page: stake as a doubter with a taunt", async ({ page }) => {
   await expect(page.getByText(/doubt recorded/i)).toBeVisible({ timeout: 15_000 });
 });
 
+test("create flow: prefilled defaults pass screening through to the new ticket", async ({ page }) => {
+  await page.goto("/create");
+  // every new ledger starts prefilled with a screening-safe default
+  await expect(page.locator("#statement")).toHaveValue(/3 kilometers every day/i);
+
+  await page.getByRole("button", { name: /screen it/i }).click();
+  await expect(page.getByText(/screened: accepted/i)).toBeVisible({ timeout: 15_000 });
+
+  await page.getByRole("button", { name: /next: the rules/i }).click();
+  await page.getByRole("button", { name: /next: the stake/i }).click();
+  await page.getByRole("button", { name: /stake 1 gen on myself/i }).click();
+
+  // lands on the freshly created challenge
+  await page.waitForURL(/\/challenge\/\d+/, { timeout: 20_000 });
+  await expect(page.getByText(/3 kilometers every day/i).first()).toBeVisible();
+});
+
 test("evidence tribunal: validator arc plays and a verdict stamps", async ({ page }) => {
   // challenge #1 is owned by the demo identity, so the submit box renders
   await page.goto("/challenge/1");

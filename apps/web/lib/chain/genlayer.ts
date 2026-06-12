@@ -366,16 +366,23 @@ async function fetchAllPaged(): Promise<z.infer<typeof RawChallengeSchema>[]> {
   return out;
 }
 
+// Sticky: a contract deployed before get_challenges_page existed fails that
+// call on EVERY read — remember the first failure instead of paying a dead
+// RPC round-trip each time.
+let pagedViewSupported = true;
+
 export function createGenLayerGrudgeClient(): GrudgeClient {
   const getAll = async (): Promise<Challenge[]> => {
-    try {
-      return (await fetchAllPaged()).map(adaptChallenge);
-    } catch {
-      // A contract deployed before get_challenges_page existed: fall back to
-      // the legacy unbounded view (same data, one call).
-      const raws = await readJson("get_open_challenges", [], z.array(RawChallengeSchema));
-      return raws.map(adaptChallenge);
+    if (pagedViewSupported) {
+      try {
+        return (await fetchAllPaged()).map(adaptChallenge);
+      } catch {
+        pagedViewSupported = false;
+      }
     }
+    // Legacy unbounded view — same data, one call.
+    const raws = await readJson("get_open_challenges", [], z.array(RawChallengeSchema));
+    return raws.map(adaptChallenge);
   };
 
   return {
@@ -405,10 +412,20 @@ export function createGenLayerGrudgeClient(): GrudgeClient {
         [input.statement, input.evidencePolicy, input.category, input.durationDays, input.requiredProofs],
         toUnits(input.selfStake),
       );
-      // The new id is the latest challenge by this creator.
+      // Resolve the new id with the cheapest read available: ids are
+      // sequential from 1, so the page total IS the newest id. Refetching the
+      // whole ledger here doubled the perceived create time — the challenge
+      // page reads get_challenge by id right after navigation anyway.
+      if (pagedViewSupported) {
+        try {
+          const page = await readJson("get_challenges_page", [0, 1], ChallengesPageSchema);
+          return { id: String(page.total), txHash };
+        } catch {
+          pagedViewSupported = false;
+        }
+      }
       const all = await getAll();
-      const latest = all[0];
-      return { id: latest?.id ?? "0", txHash };
+      return { id: all[0]?.id ?? "0", txHash };
     },
 
     async stake(id: string, side: Side, amount: number, _from: string, taunt?: string): Promise<TxResult> {

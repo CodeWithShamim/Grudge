@@ -68,7 +68,10 @@ export async function POST(request: Request) {
 
   if (body.kind === "screen") {
     const statement = body.statement ?? "";
-    const raw = await llmJudge(`${SCREEN_SYSTEM_RULES}\n\nSTATEMENT:\n${statement}`);
+    // Substitute into the {statement} placeholder so the statement lands
+    // INSIDE the prompt's <untrusted> block — appending it raw would leave
+    // the guarded block empty and re-open the injection hole.
+    const raw = await llmJudge(SCREEN_SYSTEM_RULES.replace("{statement}", statement));
     const parsed = ScreeningSchema.safeParse(raw);
     return NextResponse.json(parsed.success ? parsed.data : screenStatementLocally(statement));
   }
