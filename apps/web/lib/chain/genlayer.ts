@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { GrudgeClient } from "./client";
 import { getBradburyEnv } from "./bradbury";
 import { friendlyError } from "./errors";
+import { emitTxStatus } from "./txStatus";
 import {
   ChallengeSchema,
   ScreeningSchema,
@@ -140,13 +141,7 @@ async function buildChain(): Promise<Record<string, unknown>> {
   // expected there, not an error).
   const STUDIO_CHAIN_ID = 61999;
   const baseKey = env.chainId === STUDIO_CHAIN_ID ? "studionet" : "testnetBradbury";
-  const {
-    id: _id,
-    rpcUrls: _rpc,
-    blockExplorers: _explorers,
-    name: _name,
-    ...base
-  } = ((chains[baseKey] ?? chains["studionet"] ?? {}) as Record<string, unknown>);
+  const base = (chains[baseKey] ?? chains["studionet"] ?? {}) as Record<string, unknown>;
   return {
     ...base,
     id: env.chainId,
@@ -315,6 +310,87 @@ async function ensureBradburyChain(): Promise<void> {
   }
 }
 
+// ── consensus wait ──────────────────────────────────────────────────────
+// The SDK's waitForTransactionReceipt(status: "ACCEPTED") is unusable here:
+// it resolves on ANY decided state — UNDETERMINED / CANCELED / *_TIMEOUT
+// would be reported as success — and it throws "Transaction not found" when
+// polled before the tx indexes. So we poll getTransaction ourselves (the
+// pattern proven on the arbiq deployment) and fail loudly on bad outcomes.
+
+const SUCCESS_STATES = new Set(["ACCEPTED", "FINALIZED"]);
+const FAILURE_STATES = new Set(["UNDETERMINED", "CANCELED", "LEADER_TIMEOUT", "VALIDATORS_TIMEOUT"]);
+
+const POLL_INTERVAL = 2_000;
+const DEFAULT_POLLS = 90; // ~3 min for deterministic ops
+const AI_POLLS = 150; // ~5 min — LLM-judged ops take the full consensus window
+const AI_WRITES = new Set(["create_challenge", "submit_evidence", "dispute_evidence"]);
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/** Best-effort: the leader's error string from a failed receipt. */
+function leaderErrorDetail(tx: unknown): string {
+  const lr = (tx as { consensus_data?: { leader_receipt?: unknown } })?.consensus_data
+    ?.leader_receipt;
+  const r = (Array.isArray(lr) ? lr[0] : lr) as Record<string, unknown> | undefined;
+  const out =
+    (r?.genvm_result as Record<string, unknown> | undefined)?.stderr ??
+    r?.error ??
+    (typeof r?.result === "string" ? r.result : "");
+  return out ? String(out).slice(0, 300) : "";
+}
+
+async function waitForDecision(
+  txHash: `0x${string}`,
+  functionName: string,
+  polls: number,
+): Promise<void> {
+  const { transactionsStatusNumberToName } = await import("genlayer-js/types");
+  const statusNames = transactionsStatusNumberToName as Record<string, string>;
+  const client = await readSdk();
+
+  emitTxStatus({ txHash, functionName, status: "PENDING", done: false });
+  // Grace period: getTransaction 404s right after submission — polling
+  // immediately just burns attempts on guaranteed misses.
+  await sleep(POLL_INTERVAL);
+
+  let lastStatus = "PENDING";
+  for (let i = 0; i < polls; i++) {
+    let tx: unknown = null;
+    try {
+      tx = await client.getTransaction({ hash: txHash });
+    } catch {
+      // not indexed yet / transient RPC error — keep polling
+    }
+
+    if (tx) {
+      // Bradbury reports status as a number-string; Studio may return the name.
+      const raw = String((tx as { status?: unknown }).status ?? "");
+      const status = statusNames[raw] ?? raw;
+
+      if (status && status !== lastStatus) {
+        lastStatus = status;
+        emitTxStatus({ txHash, functionName, status, done: false });
+      }
+      if (SUCCESS_STATES.has(status)) {
+        emitTxStatus({ txHash, functionName, status, done: true, ok: true });
+        return;
+      }
+      if (FAILURE_STATES.has(status)) {
+        emitTxStatus({ txHash, functionName, status, done: true, ok: false });
+        const detail = leaderErrorDetail(tx);
+        throw new Error(`Consensus ${status}${detail ? `: ${detail}` : ""}`);
+      }
+    }
+
+    await sleep(POLL_INTERVAL);
+  }
+
+  emitTxStatus({ txHash, functionName, status: lastStatus, done: true, ok: false });
+  throw new Error(`Timed out waiting for consensus on ${functionName} (tx ${txHash})`);
+}
+
 // The write client is rebuilt per call: the connected account can change.
 async function write(functionName: string, args: unknown[], value = 0n): Promise<TxResult> {
   try {
@@ -323,14 +399,8 @@ async function write(functionName: string, args: unknown[], value = 0n): Promise
 
     const hash = await client.writeContract({ address: contractAddress(), functionName, args, value });
     const txHash = typeof hash === "string" ? hash : String(hash);
-    // ACCEPTED is the right UX gate (gltest's default too); FINALIZED can take
-    // the full consensus window on a public testnet and looks like a hang.
-    await client.waitForTransactionReceipt({
-      hash: txHash as `0x${string}`,
-      status: "ACCEPTED",
-      interval: 3_000,
-      retries: 60,
-    });
+    const polls = AI_WRITES.has(functionName) ? AI_POLLS : DEFAULT_POLLS;
+    await waitForDecision(txHash as `0x${string}`, functionName, polls);
     // State changed on-chain — stale cached reads would mask the write.
     readCache.clear();
     return { txHash };

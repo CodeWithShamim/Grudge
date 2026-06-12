@@ -45,6 +45,12 @@ const CONTRACT_ERRORS: ErrorMapping[] = [
   // ── claims ────────────────────────────────────────────────────────────
   { pattern: /nothing to claim/i, message: "Nothing to claim for this wallet." },
 
+  // ── consensus outcomes (must precede the generic timeout pattern) ─────
+  { pattern: /consensus UNDETERMINED/i, message: "Validators couldn't agree on the result — nothing was committed. Try again." },
+  { pattern: /consensus (LEADER|VALIDATORS)_TIMEOUT/i, message: "The network timed out processing this transaction — try again." },
+  { pattern: /consensus CANCELED/i, message: "The transaction was canceled by the network." },
+  { pattern: /timed out waiting for consensus/i, message: "Consensus is taking longer than usual — it may still land. Check the explorer before retrying." },
+
   // ── wallet / network ──────────────────────────────────────────────────
   { pattern: /no wallet (connected|available)/i, message: "Connect your wallet to continue." },
   { pattern: /user rejected|rejected by user|user denied/i, message: "Transaction cancelled." },

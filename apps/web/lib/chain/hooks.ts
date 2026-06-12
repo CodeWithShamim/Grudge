@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { getChainMode, getGrudgeClient } from "./client";
 import { explorerTxUrl } from "./bradbury";
 import { MOCK_ME } from "./mock";
+import { subscribeTxStatus } from "./txStatus";
 import { useWalletAddress } from "./wallet";
 import type { Challenge, CreateChallengeInput, EvidenceEntry, SettleResult, Side } from "./types";
 
@@ -27,6 +28,23 @@ export function useViewer(): { address: string; isDemo: boolean } {
   const wallet = useWalletAddress();
   if (wallet) return { address: wallet, isDemo: false };
   return { address: MOCK_ME, isDemo: true };
+}
+
+// Live consensus phases for in-flight writes (PENDING → PROPOSING →
+// COMMITTING → ACCEPTED). One loading toast per tx, keyed by hash; the
+// mutation's own success/error toast replaces it once the write settles.
+if (typeof window !== "undefined") {
+  subscribeTxStatus(({ txHash, functionName, status, done }) => {
+    const id = `tx-${txHash}`;
+    if (done) {
+      toast.dismiss(id);
+      return;
+    }
+    toast.loading(`${functionName.replace(/_/g, " ")} — ${status.toLowerCase()}`, {
+      id,
+      description: `tx ${txHash.slice(0, 10)}…${txHash.slice(-6)}`,
+    });
+  });
 }
 
 function txToast(label: string, txHash: string): void {
