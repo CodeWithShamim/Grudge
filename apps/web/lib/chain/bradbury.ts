@@ -17,9 +17,9 @@ const EnvSchema = z.object({
 
 export function getBradburyEnv(): z.infer<typeof EnvSchema> | null {
   const parsed = EnvSchema.safeParse({
-    chainId: process.env.NEXT_PUBLIC_BRADBURY_CHAIN_ID,
-    rpc: process.env.NEXT_PUBLIC_BRADBURY_RPC,
-    explorer: process.env.NEXT_PUBLIC_BRADBURY_EXPLORER,
+    chainId: process.env.NEXT_PUBLIC_CHAIN_ID,
+    rpc: process.env.NEXT_PUBLIC_RPC,
+    explorer: process.env.NEXT_PUBLIC_EXPLORER,
   });
   return parsed.success ? parsed.data : null;
 }
@@ -28,15 +28,17 @@ export function defineBradbury() {
   const env = getBradburyEnv();
   if (!env) {
     throw new Error(
-      "Bradbury env missing. Set NEXT_PUBLIC_BRADBURY_CHAIN_ID, NEXT_PUBLIC_BRADBURY_RPC and NEXT_PUBLIC_BRADBURY_EXPLORER (see `genlayer network info`).",
+      "Bradbury env missing. Set NEXT_PUBLIC_CHAIN_ID, NEXT_PUBLIC_RPC and NEXT_PUBLIC_EXPLORER (see `genlayer network info`).",
     );
   }
   return defineChain({
     id: env.chainId,
-    name: "GenLayer Testnet Bradbury",
+    name: "GenLayer Studio",
     nativeCurrency: { name: "GEN", symbol: "GEN", decimals: 18 },
     rpcUrls: { default: { http: [env.rpc] } },
-    blockExplorers: { default: { name: "GenLayer Explorer", url: env.explorer } },
+    blockExplorers: {
+      default: { name: "GenLayer Explorer", url: env.explorer },
+    },
     testnet: true,
   });
 }

@@ -40,7 +40,7 @@ export function Header() {
             <ConnectButton showBalance={false} chainStatus="icon" accountStatus="address" />
           ) : (
             <span
-              title="Mock mode — set NEXT_PUBLIC_CHAIN_MODE=genlayer to use Testnet Bradbury"
+              title="Mock mode — set NEXT_PUBLIC_CHAIN_MODE=genlayer to use GenLayer Studio"
               className="rounded-control border border-dashed border-mut/50 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-mut"
             >
               {shortAddress(address)} · demo

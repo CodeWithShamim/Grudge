@@ -123,12 +123,7 @@ type GenLayerSdkClient = {
     args: unknown[];
     value: bigint;
   }): Promise<unknown>;
-  waitForTransactionReceipt(args: {
-    hash: `0x${string}`;
-    status?: string;
-    interval?: number;
-    retries?: number;
-  }): Promise<unknown>;
+  getTransaction(args: { hash: `0x${string}` }): Promise<unknown>;
 };
 
 async function buildChain(): Promise<Record<string, unknown>> {
@@ -136,18 +131,28 @@ async function buildChain(): Promise<Record<string, unknown>> {
   if (!env) {
     throw new Error("Bradbury env not configured — see apps/web/.env.example");
   }
-  const chains = await import("genlayer-js/chains");
-  // Start from the published testnetBradbury chain object, overridden with
-  // env so nothing is hardcoded (chain id / RPC / explorer follow resets).
-  const base = (chains as Record<string, unknown>)["testnetBradbury"] ?? {};
+  const chains = (await import("genlayer-js/chains")) as Record<string, unknown>;
+  // Pick the published base chain that MATCHES the target id: each carries the
+  // consensus contract address genlayer-js routes writes to. Using the wrong
+  // base (e.g. testnetBradbury for a Studio id) sends the tx to Bradbury's
+  // consensus contract on the Studio network and the write fails. studionet is
+  // the right base for Studio (which is feeless — a 0-GEN network fee is
+  // expected there, not an error).
+  const STUDIO_CHAIN_ID = 61999;
+  const baseKey = env.chainId === STUDIO_CHAIN_ID ? "studionet" : "testnetBradbury";
+  const {
+    id: _id,
+    rpcUrls: _rpc,
+    blockExplorers: _explorers,
+    name: _name,
+    ...base
+  } = ((chains[baseKey] ?? chains["studionet"] ?? {}) as Record<string, unknown>);
   return {
-    ...(base as Record<string, unknown>),
+    ...base,
     id: env.chainId,
-    name: "GenLayer Testnet Bradbury",
-    rpcUrls: { default: { http: [env.rpc] } },
+    name: baseKey === "studionet" ? "GenLayer Studio" : "GenLayer Testnet Bradbury",
+    rpcUrls: { default: { http: [env.rpc] }, public: { http: [env.rpc] } },
     blockExplorers: { default: { name: "GenLayer Explorer", url: env.explorer } },
-    nativeCurrency: { name: "GEN", symbol: "GEN", decimals: 18 },
-    testnet: true,
   };
 }
 
@@ -305,7 +310,7 @@ async function ensureBradburyChain(): Promise<void> {
     await switchChain(config, { chainId: env.chainId });
   } catch (e) {
     throw new Error(
-      `Switch your wallet to GenLayer Testnet Bradbury to continue (${e instanceof Error ? e.message : "switch rejected"})`,
+      `Switch your wallet to GenLayer Studio to continue (${e instanceof Error ? e.message : "switch rejected"})`,
     );
   }
 }

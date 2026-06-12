@@ -1,4 +1,4 @@
-# GRUDGE — *your friends bet you'll fail.*
+# GRUDGE — _your friends bet you'll fail._
 
 A social accountability game on **GenLayer**. You stake GEN on a public real-world promise
 ("I will run 5km every day for 30 days"). Friends stake **for** (believers) or **against**
@@ -9,12 +9,12 @@ every receipt public.
 
 ## Why this is impossible without GenLayer
 
-The referee is a *subjective judgment* — "does this evidence prove the promise?" — that no
+The referee is a _subjective judgment_ — "does this evidence prove the promise?" — that no
 deterministic EVM contract or single oracle can make trustlessly. GenLayer's Intelligent
 Contracts run that judgment inside consensus: `gl.eq_principle_prompt_comparative` has the
 validator set each run the judging prompt and agree on the verdict enum, so the outcome is a
 consensus artifact, not one model's opinion. Injection attempts in evidence are adjudicated
-*by the same consensus* (auto-REJECTED).
+_by the same consensus_ (auto-REJECTED).
 
 ## Quickstart (zero config)
 
@@ -53,9 +53,9 @@ Then set in `apps/web/.env.local` (values from `genlayer network info` — never
 
 ```
 NEXT_PUBLIC_CHAIN_MODE=genlayer
-NEXT_PUBLIC_BRADBURY_CHAIN_ID=…
-NEXT_PUBLIC_BRADBURY_RPC=…
-NEXT_PUBLIC_BRADBURY_EXPLORER=…
+NEXT_PUBLIC_CHAIN_ID=…
+NEXT_PUBLIC_RPC=…
+NEXT_PUBLIC_EXPLORER=…
 ```
 
 The header gains a RainbowKit ConnectButton; wrong network → one-click "Switch to Bradbury";

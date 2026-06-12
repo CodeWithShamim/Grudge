@@ -48,9 +48,9 @@ const CONTRACT_ERRORS: ErrorMapping[] = [
   // ── wallet / network ──────────────────────────────────────────────────
   { pattern: /no wallet (connected|available)/i, message: "Connect your wallet to continue." },
   { pattern: /user rejected|rejected by user|user denied/i, message: "Transaction cancelled." },
-  { pattern: /insufficient funds/i, message: "Insufficient GEN balance — top up from the Bradbury faucet." },
+  { pattern: /insufficient funds/i, message: "Insufficient GEN balance — top up from the GenLayer faucet." },
   { pattern: /rate limit|429|too many requests/i, message: "The RPC is rate-limiting — wait a moment and try again." },
-  { pattern: /switch your wallet/i, message: "Switch your wallet to GenLayer Testnet Bradbury to continue." },
+  { pattern: /switch your wallet/i, message: "Switch your wallet to GenLayer Studio to continue." },
   { pattern: /network|fetch|Failed to fetch|ECONNREFUSED|timeout/i, message: "Network error — check your connection and try again." },
 ];
 
