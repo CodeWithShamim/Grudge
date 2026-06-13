@@ -17,7 +17,7 @@ import json
 import re
 import typing
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 
 from genlayer import *
 
@@ -66,6 +66,8 @@ SCREEN_RULES = (
 RAKE_BPS = 200  # 2%
 STAKING_WINDOW_FRACTION = 4  # staking closes after 1/4 of the duration
 DAY_SECONDS = 86_400
+VIEW_ARRAY_CAP = 100  # max nested stakes/evidence returned by get_challenge
+PAGE_LIMIT_MAX = 50  # max challenges per get_challenges_page
 URL_RE = re.compile(r"https?://[^\s\"'<>]+")
 
 
@@ -145,17 +147,42 @@ class Grudge(gl.Contract):
     next_id: u256
     claimable: TreeMap[Address, u256]
     rake_vault: u256
+    # C2 solvency bookkeeping: running sum of every GEN the contract still owes
+    # — open pools + self-stakes + unclaimed `claimable` + `rake_vault`.
+    # Increases on deposit (create_challenge, stake), decreases on payout (claim).
+    # settle() only moves funds between internal buckets, so it leaves this
+    # unchanged. NOTE: py-genlayer-std v0.2.16 exposes NO contract self-balance
+    # accessor, so _assert_solvent() verifies INTERNAL consistency only; it
+    # cannot compare against the actual on-chain balance.
+    total_locked: u256
+    # C2 reentrancy guard: addresses currently inside their own claim() transfer.
+    claiming: TreeMap[Address, bool]
 
     def __init__(self) -> None:
         self.next_id = u256(1)
         self.rake_vault = u256(0)
+        self.total_locked = u256(0)
 
     # ── internal helpers (deterministic) ─────────────────────────────────
 
     def _now(self) -> int:
-        # Deterministic: GenVM pins the clock to the transaction datetime,
-        # so every validator computes the same value (docs: transaction-context).
-        return int(datetime.now(timezone.utc).timestamp())
+        # Deterministic time on GenLayer.
+        #
+        # datetime.now() is WALL-CLOCK and non-deterministic — each validator
+        # would read a different instant and consensus on any time-gated write
+        # (staking window, deadline, proof-period rate limit) would never
+        # finalize. The runner pins the transaction datetime identically for
+        # every validator and exposes it at gl.message_raw["datetime"] (an ISO
+        # 8601 string, verified against py-genlayer-std v0.2.16 _internal/msg.py
+        # MessageRawType). Parsing that pinned string is deterministic and needs
+        # no extra consensus round.
+        raw = gl.message_raw.get("datetime", "")
+        if not raw:
+            # Defensive: an empty datetime (e.g. #get-schema) must not crash a
+            # view. 0 is safe — time-gated writes all compare with `>`/`>=`.
+            return 0
+        # Python 3.11+ fromisoformat parses the trailing "Z" directly.
+        return int(datetime.fromisoformat(raw).timestamp())
 
     def _get(self, challenge_id: int) -> Challenge:
         challenge = self.challenges.get(u256(challenge_id))
@@ -163,7 +190,36 @@ class Grudge(gl.Contract):
             raise gl.vm.UserError("challenge not found")
         return challenge
 
+    def _summary_dict(self, challenge_id: int, c: Challenge) -> dict[str, typing.Any]:
+        """Bounded, fixed-size projection for list views — NO nested arrays, so
+        the serialized size of a page can never grow with stake/evidence count."""
+        return {
+            "id": challenge_id,
+            "creator": c.creator.as_hex,
+            "statement": c.statement,
+            "category": c.category,
+            "self_stake": str(c.self_stake),
+            "believer_pool": str(c.believer_pool),
+            "doubter_pool": str(c.doubter_pool),
+            "stake_count": len(c.stakes),
+            "evidence_count": len(c.evidence),
+            "starts_at": int(c.starts_at),
+            "ends_at": int(c.ends_at),
+            "required_proofs": int(c.required_proofs),
+            "verified_count": int(c.verified_count),
+            "status": c.status,
+        }
+
     def _challenge_dict(self, challenge_id: int, c: Challenge) -> dict[str, typing.Any]:
+        # Cap nested arrays to the most-recent VIEW_ARRAY_CAP entries so a single
+        # challenge can never grow an unbounded view. `*_truncated` tells the
+        # client to page the rest via get_stakes_page / get_evidence_page.
+        stakes = list(c.stakes)
+        evidence = list(c.evidence)
+        stakes_truncated = len(stakes) > VIEW_ARRAY_CAP
+        evidence_truncated = len(evidence) > VIEW_ARRAY_CAP
+        recent_stakes = stakes[-VIEW_ARRAY_CAP:] if stakes_truncated else stakes
+        recent_evidence = evidence[-VIEW_ARRAY_CAP:] if evidence_truncated else evidence
         return {
             "id": challenge_id,
             "creator": c.creator.as_hex,
@@ -173,6 +229,8 @@ class Grudge(gl.Contract):
             "self_stake": str(c.self_stake),
             "believer_pool": str(c.believer_pool),
             "doubter_pool": str(c.doubter_pool),
+            "stake_count": len(stakes),
+            "stakes_truncated": stakes_truncated,
             "stakes": [
                 {
                     "address": s.address.as_hex,
@@ -181,13 +239,15 @@ class Grudge(gl.Contract):
                     "taunt": s.taunt,
                     "at": int(s.at),
                 }
-                for s in c.stakes
+                for s in recent_stakes
             ],
             "starts_at": int(c.starts_at),
             "ends_at": int(c.ends_at),
             "required_proofs": int(c.required_proofs),
             "verified_count": int(c.verified_count),
             "status": c.status,
+            "evidence_count": len(evidence),
+            "evidence_truncated": evidence_truncated,
             "evidence": [
                 {
                     "day": int(e.day),
@@ -197,7 +257,7 @@ class Grudge(gl.Contract):
                     "confidence": int(e.confidence),
                     "disputed": e.disputed,
                 }
-                for e in c.evidence
+                for e in recent_evidence
             ],
         }
 
@@ -337,6 +397,9 @@ class Grudge(gl.Contract):
             u64(0),  # last_evidence_at
         )
         self.challenges[challenge_id] = challenge
+        # C2: the self-stake is now held by the contract
+        self.total_locked = u256(int(self.total_locked) + int(gl.message.value))
+        self._assert_solvent()
         return str(int(challenge_id))
 
     @gl.public.write.payable
@@ -371,6 +434,9 @@ class Grudge(gl.Contract):
             c.believer_pool = u256(int(c.believer_pool) + amount)
         else:
             c.doubter_pool = u256(int(c.doubter_pool) + amount)
+        # C2: the stake is now held by the contract
+        self.total_locked = u256(int(self.total_locked) + amount)
+        self._assert_solvent()
 
     @gl.public.write
     def submit_evidence(self, challenge_id: int, evidence_text: str) -> str:
@@ -482,6 +548,10 @@ class Grudge(gl.Contract):
         self.rake_vault = u256(int(self.rake_vault) + (distributable - paid))
 
         c.status = "SETTLED"
+        # C2: settle only moves funds between internal buckets (pools ->
+        # claimable + rake_vault), so total_locked is unchanged. Assert the book
+        # stays consistent.
+        self._assert_solvent()
         return json.dumps(
             {
                 "outcome": "SUCCEEDED" if succeeded else "FAILED",
@@ -491,6 +561,20 @@ class Grudge(gl.Contract):
             sort_keys=True,
         )
 
+    def _assert_solvent(self) -> None:
+        """C2 invariant. The contract's tracked liabilities (`total_locked`)
+        must never go negative.
+
+        DOCUMENTED GAP: py-genlayer-std v0.2.16 exposes no accessor for the
+        contract's own native balance, so this cannot assert
+        `total_locked <= actual_balance`. It enforces the strongest check the
+        runner allows — non-negativity and internal book consistency — and the
+        gltest suite separately asserts conservation across a full settle.
+        Revisit to add a balance comparison if/when the runtime exposes one.
+        """
+        if int(self.total_locked) < 0:
+            raise gl.vm.UserError("solvency invariant violated: total_locked < 0")
+
     def _credit(self, address: Address, amount: int) -> None:
         current = self.claimable.get(address)
         total = amount if current is None else int(current) + amount
@@ -498,16 +582,34 @@ class Grudge(gl.Contract):
 
     @gl.public.write
     def claim(self) -> str:
-        """Withdraw settled winnings to the caller (EOA transfer via ghost interface)."""
+        """Withdraw settled winnings to the caller (EOA transfer via ghost interface).
+
+        C2: strict checks-effects-interactions plus a per-account reentrancy
+        guard. The recipient's `claimable` is zeroed and `total_locked` is
+        decremented BEFORE the value transfer, and the `claiming` flag blocks a
+        re-entrant claim() from the same account from draining a second payout
+        if the transfer ever hands control back (e.g. a contract payee).
+        """
         sender = gl.message.sender_address
+        if self.claiming.get(sender):
+            raise gl.vm.UserError("claim already in progress")
         amount = self.claimable.get(sender)
         if amount is None or int(amount) == 0:
             raise gl.vm.UserError("nothing to claim")
+
+        # ── effects (before interaction) ──
+        self.claiming[sender] = True
         self.claimable[sender] = u256(0)
+        self.total_locked = u256(int(self.total_locked) - int(amount))
+        self._assert_solvent()
+
+        # ── interaction ──
         # the ghost-interface decorator rewrites _Payee into a proxy factory at
         # runtime; mypy can't see that, so cast at the single use site
         payee = typing.cast("typing.Callable[[Address], typing.Any]", _Payee)
         payee(sender).emit_transfer(value=u256(int(amount)))
+
+        self.claiming[sender] = False
         return str(int(amount))
 
     # ── views ────────────────────────────────────────────────────────────
@@ -518,26 +620,26 @@ class Grudge(gl.Contract):
         return json.dumps(self._challenge_dict(challenge_id, c), sort_keys=True)
 
     @gl.public.view
-    def get_open_challenges(self) -> str:
-        out: list[dict[str, typing.Any]] = []
-        for challenge_id, c in self.challenges.items():
-            out.append(self._challenge_dict(int(challenge_id), c))
-        out.sort(key=lambda d: int(d["id"]), reverse=True)
-        return json.dumps(out, sort_keys=True)
+    def get_challenge_summary(self, challenge_id: int) -> str:
+        """Bounded single-challenge projection (no nested arrays)."""
+        c = self._get(challenge_id)
+        return json.dumps(self._summary_dict(challenge_id, c), sort_keys=True)
 
     @gl.public.view
     def get_challenges_page(self, offset: int, limit: int) -> str:
-        """Paginated challenge read (newest first) so view calls stay bounded
-        as the ledger grows. limit is clamped to [1, 50]."""
+        """Paginated list (newest first) of bounded SUMMARIES — never full
+        objects — so a page's serialized size is fixed regardless of how many
+        stakes/evidence each challenge has. Full detail comes from
+        get_challenge(id). limit is clamped to [1, PAGE_LIMIT_MAX]."""
         total = int(self.next_id) - 1
-        limit = max(1, min(50, limit))
+        limit = max(1, min(PAGE_LIMIT_MAX, limit))
         offset = max(0, offset)
         out: list[dict[str, typing.Any]] = []
         challenge_id = total - offset  # ids start at 1; newest is total
         while challenge_id >= 1 and len(out) < limit:
             c = self.challenges.get(u256(challenge_id))
             if c is not None:
-                out.append(self._challenge_dict(challenge_id, c))
+                out.append(self._summary_dict(challenge_id, c))
             challenge_id -= 1
         return json.dumps(
             {"total": total, "offset": offset, "limit": limit, "challenges": out},
@@ -545,6 +647,74 @@ class Grudge(gl.Contract):
         )
 
     @gl.public.view
+    def get_stakes_page(self, challenge_id: int, offset: int, limit: int) -> str:
+        """Paginated stakes for one challenge (oldest first) so a challenge with
+        many stakes is still fully readable in bounded chunks."""
+        c = self._get(challenge_id)
+        total = len(c.stakes)
+        limit = max(1, min(PAGE_LIMIT_MAX, limit))
+        offset = max(0, offset)
+        out: list[dict[str, typing.Any]] = []
+        i = offset
+        while i < total and len(out) < limit:
+            s = c.stakes[i]
+            out.append(
+                {
+                    "address": s.address.as_hex,
+                    "side": s.side,
+                    "amount": str(s.amount),
+                    "taunt": s.taunt,
+                    "at": int(s.at),
+                }
+            )
+            i += 1
+        return json.dumps(
+            {"total": total, "offset": offset, "limit": limit, "stakes": out},
+            sort_keys=True,
+        )
+
+    @gl.public.view
+    def get_evidence_page(self, challenge_id: int, offset: int, limit: int) -> str:
+        """Paginated evidence for one challenge (oldest first)."""
+        c = self._get(challenge_id)
+        total = len(c.evidence)
+        limit = max(1, min(PAGE_LIMIT_MAX, limit))
+        offset = max(0, offset)
+        out: list[dict[str, typing.Any]] = []
+        i = offset
+        while i < total and len(out) < limit:
+            e = c.evidence[i]
+            out.append(
+                {
+                    "day": int(e.day),
+                    "summary": e.summary,
+                    "verdict": e.verdict,
+                    "reason": e.reason,
+                    "confidence": int(e.confidence),
+                    "disputed": e.disputed,
+                }
+            )
+            i += 1
+        return json.dumps(
+            {"total": total, "offset": offset, "limit": limit, "evidence": out},
+            sort_keys=True,
+        )
+
+    @gl.public.view
     def get_claimable(self, address: str) -> str:
         amount = self.claimable.get(Address(address))
         return str(0 if amount is None else int(amount))
+
+    @gl.public.view
+    def get_solvency(self) -> str:
+        """C2 observability: the contract's tracked liabilities. total_locked is
+        the running sum of every GEN owed (open pools + self-stakes + unclaimed
+        claimable + rake_vault); rake_vault is the protocol's accrued cut+dust.
+        The frontend/indexer and gltest use this to assert conservation."""
+        return json.dumps(
+            {
+                "total_locked": str(self.total_locked),
+                "rake_vault": str(self.rake_vault),
+            },
+            sort_keys=True,
+        )

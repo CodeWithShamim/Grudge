@@ -421,44 +421,77 @@ async function readJson<S extends z.ZodTypeAny>(
 
 const PAGE_LIMIT = 50;
 
+/**
+ * Bounded list projection emitted by the contract's get_challenges_page. It
+ * carries NO nested stakes/evidence arrays (only counts) so a page's size is
+ * fixed regardless of activity — full detail comes from get_challenge(id).
+ */
+const SummarySchema = z.object({
+  id: z.number(),
+  creator: z.string(),
+  statement: z.string(),
+  category: z.string().default("general"),
+  self_stake: z.string(),
+  believer_pool: z.string(),
+  doubter_pool: z.string(),
+  stake_count: z.number(),
+  evidence_count: z.number(),
+  starts_at: z.number(),
+  ends_at: z.number(),
+  required_proofs: z.number(),
+  verified_count: z.number(),
+  status: z.enum(["ACTIVE", "SUCCEEDED", "FAILED", "SETTLED"]),
+});
+
 const ChallengesPageSchema = z.object({
   total: z.number(),
   offset: z.number(),
   limit: z.number(),
-  challenges: z.array(RawChallengeSchema),
+  challenges: z.array(SummarySchema),
 });
 
+/**
+ * Adapt a bounded summary to a Challenge with EMPTY stakes/evidence arrays.
+ * List views (feed, hero ledger, leaderboards) only read pools/status/
+ * statement; the detail page calls getChallenge(id) for the full object.
+ */
+function adaptSummary(raw: z.infer<typeof SummarySchema>): Challenge {
+  return ChallengeSchema.parse({
+    id: String(raw.id),
+    creator: raw.creator,
+    statement: raw.statement,
+    evidencePolicy: "",
+    category: raw.category,
+    selfStake: fromUnits(BigInt(raw.self_stake)),
+    believerPool: fromUnits(BigInt(raw.believer_pool)),
+    doubterPool: fromUnits(BigInt(raw.doubter_pool)),
+    stakes: [],
+    startsAt: raw.starts_at * 1000,
+    endsAt: raw.ends_at * 1000,
+    requiredProofs: raw.required_proofs,
+    verifiedCount: raw.verified_count,
+    status: raw.status,
+    evidence: [],
+  });
+}
+
 /** Page through get_challenges_page so no single gen_call is unbounded. */
-async function fetchAllPaged(): Promise<z.infer<typeof RawChallengeSchema>[]> {
-  const out: z.infer<typeof RawChallengeSchema>[] = [];
+async function fetchAllPaged(): Promise<Challenge[]> {
+  const out: Challenge[] = [];
   let offset = 0;
   for (;;) {
     const page = await readJson("get_challenges_page", [offset, PAGE_LIMIT], ChallengesPageSchema);
-    out.push(...page.challenges);
+    out.push(...page.challenges.map(adaptSummary));
     offset += PAGE_LIMIT;
     if (page.challenges.length === 0 || out.length >= page.total) break;
   }
   return out;
 }
 
-// Sticky: a contract deployed before get_challenges_page existed fails that
-// call on EVERY read — remember the first failure instead of paying a dead
-// RPC round-trip each time.
-let pagedViewSupported = true;
-
 export function createGenLayerGrudgeClient(): GrudgeClient {
-  const getAll = async (): Promise<Challenge[]> => {
-    if (pagedViewSupported) {
-      try {
-        return (await fetchAllPaged()).map(adaptChallenge);
-      } catch {
-        pagedViewSupported = false;
-      }
-    }
-    // Legacy unbounded view — same data, one call.
-    const raws = await readJson("get_open_challenges", [], z.array(RawChallengeSchema));
-    return raws.map(adaptChallenge);
-  };
+  // get_challenges_page is the ONLY list read — the unbounded get_open_challenges
+  // was removed from the contract (it would revert as the ledger grows).
+  const getAll = async (): Promise<Challenge[]> => fetchAllPaged();
 
   return {
     mode: "genlayer",
@@ -491,16 +524,8 @@ export function createGenLayerGrudgeClient(): GrudgeClient {
       // sequential from 1, so the page total IS the newest id. Refetching the
       // whole ledger here doubled the perceived create time — the challenge
       // page reads get_challenge by id right after navigation anyway.
-      if (pagedViewSupported) {
-        try {
-          const page = await readJson("get_challenges_page", [0, 1], ChallengesPageSchema);
-          return { id: String(page.total), txHash };
-        } catch {
-          pagedViewSupported = false;
-        }
-      }
-      const all = await getAll();
-      return { id: all[0]?.id ?? "0", txHash };
+      const page = await readJson("get_challenges_page", [0, 1], ChallengesPageSchema);
+      return { id: String(page.total), txHash };
     },
 
     async stake(id: string, side: Side, amount: number, _from: string, taunt?: string): Promise<TxResult> {
