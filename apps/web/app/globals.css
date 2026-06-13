@@ -44,6 +44,16 @@
     border-radius: inherit;
   }
 
+  /* Faint blueprint grid for hero/section backdrops, fading toward the edges */
+  .bg-grid-fade {
+    background-image:
+      linear-gradient(to right, rgba(138, 143, 153, 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(138, 143, 153, 0.06) 1px, transparent 1px);
+    background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, #000 40%, transparent 100%);
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, #000 40%, transparent 100%);
+  }
+
   /* Diagonal stripes that drift continuously (GPU-only background-position) */
   .stripes-believe {
     background-image: repeating-linear-gradient(

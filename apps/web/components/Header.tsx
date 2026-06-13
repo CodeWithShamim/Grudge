@@ -26,7 +26,6 @@ export function Header() {
           <Link href="/" className="hover:text-paper">Ledger</Link>
           <Link href="/leaderboards" className="hover:text-paper">Boards</Link>
           <Link href={`/profile/${address}`} className="hover:text-paper">Record</Link>
-          <Link href="/dev/components" className="hover:text-paper">Gallery</Link>
         </nav>
         <div className="flex items-center gap-3">
           <span className="hidden font-mono text-[10px] uppercase tracking-widest text-mut md:inline">⌘K</span>
