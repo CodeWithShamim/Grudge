@@ -47,3 +47,14 @@ export function explorerTxUrl(txHash: string): string {
   const env = getBradburyEnv();
   return env ? `${env.explorer.replace(/\/$/, "")}/tx/${txHash}` : "#";
 }
+
+/** Link to an address page on the GenLayer explorer (e.g. a creator or the contract). */
+export function explorerAddressUrl(address: string): string {
+  const env = getBradburyEnv();
+  return env ? `${env.explorer.replace(/\/$/, "")}/address/${address}` : "#";
+}
+
+/** The deployed GRUDGE contract address, or null when unset. */
+export function grudgeContractAddress(): string | null {
+  return process.env.NEXT_PUBLIC_GRUDGE_CONTRACT_ADDRESS ?? null;
+}

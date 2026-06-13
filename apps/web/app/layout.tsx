@@ -5,6 +5,7 @@ import "./globals.css";
 import { ChainProviders } from "@/lib/chain/wallet";
 import { Header } from "@/components/Header";
 import { CommandMenu } from "@/components/CommandMenu";
+import { DocsFab } from "@/components/DocsFab";
 
 const display = Anton({ weight: "400", subsets: ["latin"], variable: "--font-display", display: "swap", style: "normal" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
@@ -29,9 +30,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Header />
           <main>{children}</main>
           <CommandMenu />
+          <DocsFab />
           <Toaster
             theme="dark"
-            position="bottom-right"
+            position="top-right"
             toastOptions={{
               style: { background: "#1e222a", border: "1px solid #2a2f39", color: "#f5f1e6" },
             }}

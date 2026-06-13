@@ -24,6 +24,7 @@ export function Header() {
         </Link>
         <nav className="hidden items-center gap-5 font-mono text-xs uppercase tracking-widest text-mut sm:flex">
           <Link href="/" className="hover:text-paper">Ledger</Link>
+          <Link href="/explorer" className="hover:text-paper">Explorer</Link>
           <Link href="/leaderboards" className="hover:text-paper">Boards</Link>
           <Link href={`/profile/${address}`} className="hover:text-paper">Record</Link>
           <Link href="/docs" className="hover:text-paper">Docs</Link>
