@@ -329,16 +329,77 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/** Best-effort: the leader's error string from a failed receipt. */
-function leaderErrorDetail(tx: unknown): string {
+/** The (possibly array-wrapped) leader receipt of a transaction. */
+function leaderReceipt(tx: unknown): Record<string, unknown> | undefined {
   const lr = (tx as { consensus_data?: { leader_receipt?: unknown } })?.consensus_data
     ?.leader_receipt;
-  const r = (Array.isArray(lr) ? lr[0] : lr) as Record<string, unknown> | undefined;
-  const out =
-    (r?.genvm_result as Record<string, unknown> | undefined)?.stderr ??
-    r?.error ??
-    (typeof r?.result === "string" ? r.result : "");
-  return out ? String(out).slice(0, 300) : "";
+  return (Array.isArray(lr) ? lr[0] : lr) as Record<string, unknown> | undefined;
+}
+
+/**
+ * Pull the contract's own error string out of a transaction receipt — the exact
+ * "Error Message" the GenLayer explorer shows for a reverted tx (e.g. "creator
+ * cannot doubt themselves").
+ *
+ * On Studio the SDK decodes the leader receipt's `result` into
+ * `{ status: "rollback" | "contract_error", payload: "<message>" }` — the
+ * payload IS the message (stdout/stderr are empty for a clean UserError). We
+ * read that first, then fall back to stderr / wrapped forms for other runners.
+ */
+function leaderErrorDetail(tx: unknown): string {
+  const r = leaderReceipt(tx);
+  if (!r) return "";
+
+  // Studio: decoded result object with the message in `payload`.
+  const result = r.result as Record<string, unknown> | string | undefined;
+  if (result && typeof result === "object") {
+    const status = String(result.status ?? "");
+    if (status === "rollback" || status === "contract_error" || status === "error") {
+      const payload = result.payload;
+      if (typeof payload === "string" && payload.trim()) return cleanMessage(payload);
+    }
+  }
+
+  // Other runners: stderr / error / a stringy result.
+  const gv = r.genvm_result as Record<string, unknown> | undefined;
+  const candidate =
+    gv?.stderr ?? r.error ?? (typeof result === "string" ? result : "") ?? "";
+  const text = String(candidate).trim();
+  return text ? cleanMessage(text) : "";
+}
+
+/** Strip Python wrappers so "Rollback('msg')" / "UserError: msg" → "msg". */
+function cleanMessage(text: string): string {
+  const t = text.trim();
+  const m =
+    t.match(/UserError[^:]*:\s*(.+?)(?:\n|$)/) ??
+    t.match(/Rollback\(["']?(.+?)["']?\)/) ??
+    t.match(/Error:\s*(.+?)(?:\n|$)/);
+  return (m?.[1] ?? t).trim().slice(0, 300);
+}
+
+/** Did the tx execute the contract but revert (vs. succeed)? */
+function executionReverted(tx: unknown): boolean {
+  const t = tx as { txExecutionResultName?: unknown; txExecutionResult?: unknown };
+
+  // Public-testnet path: the SDK computes the execution-result enum.
+  const name = typeof t.txExecutionResultName === "string" ? t.txExecutionResultName : "";
+  if (name) return name === "FINISHED_WITH_ERROR";
+  if (t.txExecutionResult !== undefined) return Number(t.txExecutionResult) === 2;
+
+  // Studio path: read the decoded leader receipt's result status directly.
+  const r = leaderReceipt(tx);
+  const result = r?.result as Record<string, unknown> | string | undefined;
+  if (result && typeof result === "object") {
+    const status = String(result.status ?? "").toLowerCase();
+    // "return" is the only success status; everything else is a revert/error.
+    if (status) return status !== "return" && status !== "none";
+  }
+  const er = String(r?.execution_result ?? "").toUpperCase();
+  if (er) return er.includes("ERROR") || er.includes("ROLLBACK") || er.includes("REVERT");
+
+  // Last resort: a non-empty extracted message means it reverted.
+  return Boolean(leaderErrorDetail(tx));
 }
 
 async function waitForDecision(
@@ -374,6 +435,14 @@ async function waitForDecision(
         emitTxStatus({ txHash, functionName, status, done: false });
       }
       if (SUCCESS_STATES.has(status)) {
+        // Consensus decided — but the tx may have EXECUTED and reverted (the
+        // contract raised a UserError). The explorer shows that message; so do
+        // we, instead of falsely reporting success.
+        if (executionReverted(tx)) {
+          emitTxStatus({ txHash, functionName, status, done: true, ok: false });
+          const detail = leaderErrorDetail(tx);
+          throw new Error(detail || "The contract rejected this transaction.");
+        }
         emitTxStatus({ txHash, functionName, status, done: true, ok: true });
         return;
       }

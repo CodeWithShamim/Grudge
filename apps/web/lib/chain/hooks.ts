@@ -47,6 +47,18 @@ if (typeof window !== "undefined") {
   });
 }
 
+/**
+ * Surface the contract's own error as the toast TITLE (the prominent line),
+ * with the action context as the smaller description. `write()` already
+ * extracts the on-chain UserError into err.message via friendlyError, so this
+ * shows exactly what the explorer would for a reverted tx.
+ */
+function errToast(context: string, err: unknown): void {
+  const message =
+    err instanceof Error && err.message ? err.message : "Something went wrong. Please try again.";
+  toast.error(message, { description: context });
+}
+
 function txToast(label: string, txHash: string): void {
   const isMock = getChainMode() === "mock";
   toast.success(label, {
@@ -98,7 +110,7 @@ export function useCreateChallenge() {
       txToast("Grudge recorded. Let them doubt.", txHash);
       return id;
     },
-    onError: (e) => toast.error("Couldn't create the grudge", { description: e.message }),
+    onError: (e) => errToast("Couldn't create the grudge", e),
   });
 }
 
@@ -124,9 +136,7 @@ export function useStake(challengeId: string) {
     },
     onError: (e, _vars, ctx) => {
       if (ctx?.prev) qc.setQueryData(qk.challenge(challengeId), ctx.prev);
-      toast.error("Stake failed — rolled back", {
-        description: e.message,
-      });
+      errToast("Stake failed — rolled back", e);
     },
     onSuccess: ({ txHash }, vars) => {
       txToast(vars.side === "doubt" ? "Doubt recorded. It's public now." : "Belief recorded.", txHash);
@@ -144,7 +154,7 @@ export function useSubmitEvidence(challengeId: string) {
   return useMutation({
     mutationFn: async (evidenceText: string): Promise<{ txHash: string; entry: EvidenceEntry }> =>
       (await getGrudgeClient()).submitEvidence(challengeId, evidenceText, address),
-    onError: (e) => toast.error("Evidence not recorded", { description: e.message }),
+    onError: (e) => errToast("Evidence not recorded", e),
     onSettled: () => void qc.invalidateQueries({ queryKey: qk.challenge(challengeId) }),
   });
 }
@@ -161,7 +171,7 @@ export function useDisputeEvidence(challengeId: string) {
         txHash,
       );
     },
-    onError: (e) => toast.error("Dispute failed", { description: e.message }),
+    onError: (e) => errToast("Dispute failed", e),
     onSettled: () => void qc.invalidateQueries({ queryKey: qk.challenge(challengeId) }),
   });
 }
@@ -171,7 +181,7 @@ export function useSettle(challengeId: string) {
   return useMutation({
     mutationFn: async (): Promise<SettleResult> => (await getGrudgeClient()).settle(challengeId),
     onSuccess: (res) => txToast(res.outcome === "SUCCEEDED" ? "Settled: they did it." : "Settled: called it.", res.txHash),
-    onError: (e) => toast.error("Settle failed", { description: e.message }),
+    onError: (e) => errToast("Settle failed", e),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: qk.challenge(challengeId) });
       void qc.invalidateQueries({ queryKey: qk.open });
@@ -198,7 +208,7 @@ export function useClaim() {
     onSuccess: ({ txHash, amount }) => {
       txToast(`Claimed ${amount} GEN. Spend it loudly.`, txHash);
     },
-    onError: (e) => toast.error("Claim failed", { description: e.message }),
+    onError: (e) => errToast("Claim failed", e),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: qk.claimable(address) });
       void qc.invalidateQueries({ queryKey: qk.profile(address) });
