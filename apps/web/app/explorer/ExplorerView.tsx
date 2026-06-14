@@ -12,6 +12,7 @@ import { explorerAddressUrl, grudgeContractAddress } from "@/lib/chain/bradbury"
 import type { Challenge, ChallengeStatus } from "@/lib/chain/types";
 import { TicketCard, TicketCardSkeleton } from "@/components/TicketCard";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Pagination, usePagination, PAGE_SIZE } from "@/components/ui/Pagination";
 
 function shortHex(addr: string): string {
   return addr.length > 12 ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr;
@@ -39,8 +40,6 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: "ending", label: "Ending soon" },
 ];
 
-const PAGE_SIZE = 12;
-
 function pot(c: Challenge): number {
   return c.believerPool + c.doubterPool + c.selfStake;
 }
@@ -55,7 +54,6 @@ export function ExplorerView() {
   const [status, setStatus] = useState<"all" | ChallengeStatus>("all");
   const [category, setCategory] = useState("all");
   const [sort, setSort] = useState<SortKey>("newest");
-  const [page, setPage] = useState(0);
 
   const categories = useMemo(
     () => ["all", ...Array.from(new Set((data ?? []).map((c) => c.category)))],
@@ -88,15 +86,9 @@ export function ExplorerView() {
     return sorted;
   }, [data, status, category, query, sort]);
 
-  // reset to first page whenever the filter set changes
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, pageCount - 1);
-  const visible = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
-
-  const resetPageThen = <T,>(setter: (v: T) => void) => (v: T) => {
-    setter(v);
-    setPage(0);
-  };
+  // Paginate; reset to page 1 whenever the filter/search/sort set changes.
+  const resetKey = `${status}|${category}|${query}|${sort}`;
+  const { items: visible, page, pageCount, next, prev } = usePagination(filtered, PAGE_SIZE, resetKey);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-16">
@@ -140,7 +132,7 @@ export function ExplorerView() {
           <input
             type="search"
             value={query}
-            onChange={(e) => resetPageThen(setQuery)(e.target.value)}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Search statement, creator, or grudge #…"
             className="w-full rounded-control border border-ink-line bg-ink-soft px-4 py-2.5 font-sans text-sm text-paper placeholder:text-mut/50 focus:border-gold focus:outline-none sm:max-w-md"
             aria-label="Search grudges"
@@ -149,7 +141,7 @@ export function ExplorerView() {
             Sort
             <select
               value={sort}
-              onChange={(e) => resetPageThen(setSort)(e.target.value as SortKey)}
+              onChange={(e) => setSort(e.target.value as SortKey)}
               className="rounded-control border border-ink-line bg-ink-soft px-3 py-2 text-paper focus:border-gold focus:outline-none"
             >
               {SORTS.map((s) => (
@@ -168,7 +160,7 @@ export function ExplorerView() {
               key={t.key}
               role="tab"
               aria-selected={status === t.key}
-              onClick={() => resetPageThen(setStatus)(t.key)}
+              onClick={() => setStatus(t.key)}
               className={cn(
                 "rounded-chip px-3 py-1 font-mono text-[11px] uppercase tracking-widest transition-colors",
                 status === t.key ? "bg-gold text-ink" : "bg-ink-raised text-mut hover:text-paper",
@@ -187,7 +179,7 @@ export function ExplorerView() {
                 key={cat}
                 role="tab"
                 aria-selected={category === cat}
-                onClick={() => resetPageThen(setCategory)(cat)}
+                onClick={() => setCategory(cat)}
                 className={cn(
                   "rounded-chip px-3 py-1 font-mono text-[10px] uppercase tracking-widest transition-colors",
                   category === cat ? "bg-paper text-ink" : "bg-ink-soft text-mut hover:text-paper",
@@ -231,7 +223,7 @@ export function ExplorerView() {
             {filtered.length} {filtered.length === 1 ? "grudge" : "grudges"}
           </p>
           <motion.div
-            key={`${status}-${category}-${query}-${sort}-${safePage}`}
+            key={`${resetKey}-${page}`}
             variants={pick(staggerList)}
             initial="hidden"
             animate="visible"
@@ -256,28 +248,7 @@ export function ExplorerView() {
             ))}
           </motion.div>
 
-          {/* pagination */}
-          {pageCount > 1 && (
-            <div className="mt-10 flex items-center justify-center gap-4 font-mono text-xs uppercase tracking-widest">
-              <button
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                disabled={safePage === 0}
-                className="rounded-control border border-ink-line px-4 py-2 text-mut transition-colors hover:text-paper disabled:opacity-40 disabled:hover:text-mut"
-              >
-                ← Prev
-              </button>
-              <span className="text-mut">
-                {safePage + 1} / {pageCount}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-                disabled={safePage >= pageCount - 1}
-                className="rounded-control border border-ink-line px-4 py-2 text-mut transition-colors hover:text-paper disabled:opacity-40 disabled:hover:text-mut"
-              >
-                Next →
-              </button>
-            </div>
-          )}
+          <Pagination page={page} pageCount={pageCount} onPrev={prev} onNext={next} />
         </>
       )}
     </div>

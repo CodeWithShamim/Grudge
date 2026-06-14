@@ -10,6 +10,7 @@ import { useOpenChallenges } from "@/lib/chain/hooks";
 import { EMPTY_STATES } from "@/lib/psychology/copy";
 import { TicketCard, TicketCardSkeleton } from "@/components/TicketCard";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Pagination, usePagination } from "@/components/ui/Pagination";
 
 /** Live grudge feed with category chips, staggered tickets, shaped skeletons. */
 export function Feed() {
@@ -22,6 +23,7 @@ export function Feed() {
     [data],
   );
   const filtered = (data ?? []).filter((c) => category === "all" || c.category === category);
+  const { items, page, pageCount, next, prev } = usePagination(filtered, 9, category);
 
   return (
     <section id="feed" className="mx-auto max-w-6xl px-4 py-20">
@@ -70,16 +72,20 @@ export function Feed() {
           }
         />
       ) : (
-        <motion.div
-          variants={pick(staggerList)}
-          initial="hidden"
-          animate="visible"
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-        >
-          {filtered.map((c) => (
-            <TicketCard key={c.id} challenge={c} />
-          ))}
-        </motion.div>
+        <>
+          <motion.div
+            key={`${category}-${page}`}
+            variants={pick(staggerList)}
+            initial="hidden"
+            animate="visible"
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            {items.map((c) => (
+              <TicketCard key={c.id} challenge={c} />
+            ))}
+          </motion.div>
+          <Pagination page={page} pageCount={pageCount} onPrev={prev} onNext={next} />
+        </>
       )}
     </section>
   );

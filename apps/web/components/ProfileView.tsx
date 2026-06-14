@@ -9,6 +9,7 @@ import { EMPTY_STATES } from "@/lib/psychology/copy";
 import { shortAddress } from "@/lib/utils";
 import { GenAmount } from "./ui/GenAmount";
 import { EmptyState } from "./ui/EmptyState";
+import { Pagination, usePagination } from "./ui/Pagination";
 
 export function ProfileView({ address }: { address: string }) {
   const { data: profile, isLoading } = useProfile(address);
@@ -17,6 +18,9 @@ export function ProfileView({ address }: { address: string }) {
   const { data: claimable = 0 } = useClaimable(address);
   const claim = useClaim();
   const { pick } = useReducedMotionSafe();
+
+  // paginate the receipts (called before the early return — rules of hooks)
+  const receipts = usePagination(profile?.calledItReceipts ?? [], 9, address);
 
   if (isLoading || !profile) {
     return (
@@ -86,26 +90,34 @@ export function ProfileView({ address }: { address: string }) {
         {profile.calledItReceipts.length === 0 ? (
           <EmptyState line={EMPTY_STATES.receipts} />
         ) : (
-          <div className="flex flex-wrap gap-4">
-            {profile.calledItReceipts.map((r, i) => (
-              <motion.div
-                key={`${r.challengeId}-${i}`}
-                custom={i}
-                variants={pick(receiptDeal)}
-                className="grain relative w-52 rounded-card bg-paper p-4 text-ink shadow-e3"
-              >
-                <p className="font-display text-xl uppercase italic leading-none">Called it</p>
-                <Link href={`/challenge/${r.challengeId}`} className="mt-2 block truncate text-xs hover:underline">
-                  &ldquo;{r.statement}&rdquo;
-                </Link>
-                <div className="mt-2 flex justify-between font-mono text-xs tabular-nums">
-                  <span>staked {Math.round(r.amount)}</span>
-                  <span className="font-bold">won {Math.round(r.winnings)}</span>
-                </div>
-                <div className="perforation mt-3 h-2 w-full opacity-40" aria-hidden />
-              </motion.div>
-            ))}
-          </div>
+          <>
+            <div className="flex flex-wrap gap-4">
+              {receipts.items.map((r, i) => (
+                <motion.div
+                  key={`${r.challengeId}-${i}`}
+                  custom={i}
+                  variants={pick(receiptDeal)}
+                  className="grain relative w-52 rounded-card bg-paper p-4 text-ink shadow-e3"
+                >
+                  <p className="font-display text-xl uppercase italic leading-none">Called it</p>
+                  <Link href={`/challenge/${r.challengeId}`} className="mt-2 block truncate text-xs hover:underline">
+                    &ldquo;{r.statement}&rdquo;
+                  </Link>
+                  <div className="mt-2 flex justify-between font-mono text-xs tabular-nums">
+                    <span>staked {Math.round(r.amount)}</span>
+                    <span className="font-bold">won {Math.round(r.winnings)}</span>
+                  </div>
+                  <div className="perforation mt-3 h-2 w-full opacity-40" aria-hidden />
+                </motion.div>
+              ))}
+            </div>
+            <Pagination
+              page={receipts.page}
+              pageCount={receipts.pageCount}
+              onPrev={receipts.prev}
+              onNext={receipts.next}
+            />
+          </>
         )}
       </motion.section>
     </motion.div>
