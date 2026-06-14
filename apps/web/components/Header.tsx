@@ -4,6 +4,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { getChainMode } from "@/lib/chain/client";
 import { useViewer } from "@/lib/chain/hooks";
+import { explorerAddressUrl, grudgeContractAddress } from "@/lib/chain/bradbury";
 import { shortAddress } from "@/lib/utils";
 
 // Email/embedded-wallet account chip only ships in genlayer mode (code-split).
@@ -15,6 +16,7 @@ const AccountChip = dynamic(
 export function Header() {
   const mode = getChainMode();
   const { address } = useViewer();
+  const contract = mode === "genlayer" ? grudgeContractAddress() : null;
 
   return (
     <header className="sticky top-0 z-40 border-b border-ink-line bg-ink/85 backdrop-blur-md">
@@ -28,6 +30,18 @@ export function Header() {
           <Link href="/leaderboards" className="hover:text-paper">Boards</Link>
           <Link href={`/profile/${address}`} className="hover:text-paper">Record</Link>
           <Link href="/docs" className="hover:text-paper">Docs</Link>
+          {contract && (
+            <a
+              href={explorerAddressUrl(contract)}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Contract ${contract} on the GenLayer explorer`}
+              className="flex items-center gap-1.5 rounded-chip border border-ink-line bg-ink-soft px-2 py-1 text-[10px] normal-case tracking-normal text-mut transition-colors hover:border-gold/50 hover:text-paper"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+              {shortAddress(contract)} ↗
+            </a>
+          )}
         </nav>
         <div className="flex items-center gap-3">
           <span className="hidden font-mono text-[10px] uppercase tracking-widest text-mut md:inline">⌘K</span>

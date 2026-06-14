@@ -6,6 +6,7 @@ import { ChainProviders } from "@/lib/chain/wallet";
 import { Header } from "@/components/Header";
 import { CommandMenu } from "@/components/CommandMenu";
 import { DocsFab } from "@/components/DocsFab";
+import { Footer } from "@/components/Footer";
 import { JsonLd } from "@/components/JsonLd";
 import { SITE, SITE_URL, absoluteUrl } from "@/lib/seo";
 
@@ -94,6 +95,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ChainProviders>
           <Header />
           <main>{children}</main>
+          <Footer />
           <CommandMenu />
           <DocsFab />
           <Toaster

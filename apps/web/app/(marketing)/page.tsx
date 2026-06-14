@@ -14,9 +14,6 @@ export default function LandingPage() {
       <Hero />
       <HowItWorks />
       <Feed />
-      <footer className="border-t border-ink-line py-10 text-center font-mono text-[10px] uppercase tracking-widest text-mut">
-        every doubt recorded · every receipt public · refereed by GenLayer validator consensus
-      </footer>
     </>
   );
 }
