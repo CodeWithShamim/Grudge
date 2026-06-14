@@ -132,7 +132,10 @@ async function buildChain(): Promise<Record<string, unknown>> {
   if (!env) {
     throw new Error("Bradbury env not configured — see apps/web/.env.example");
   }
-  const chains = (await import("genlayer-js/chains")) as Record<string, unknown>;
+  const chains = (await import("genlayer-js/chains")) as Record<
+    string,
+    unknown
+  >;
   // Pick the published base chain that MATCHES the target id: each carries the
   // consensus contract address genlayer-js routes writes to. Using the wrong
   // base (e.g. testnetBradbury for a Studio id) sends the tx to Bradbury's
@@ -140,14 +143,21 @@ async function buildChain(): Promise<Record<string, unknown>> {
   // the right base for Studio (which is feeless — a 0-GEN network fee is
   // expected there, not an error).
   const STUDIO_CHAIN_ID = 61999;
-  const baseKey = env.chainId === STUDIO_CHAIN_ID ? "studionet" : "testnetBradbury";
-  const base = (chains[baseKey] ?? chains["studionet"] ?? {}) as Record<string, unknown>;
+  const baseKey =
+    env.chainId === STUDIO_CHAIN_ID ? "studionet" : "testnetBradbury";
+  const base = (chains[baseKey] ?? chains["studionet"] ?? {}) as Record<
+    string,
+    unknown
+  >;
   return {
     ...base,
     id: env.chainId,
-    name: baseKey === "studionet" ? "GenLayer Studio" : "GenLayer Testnet Bradbury",
+    name:
+      baseKey === "studionet" ? "GenLayer Studio" : "GenLayer Testnet Bradbury",
     rpcUrls: { default: { http: [env.rpc] }, public: { http: [env.rpc] } },
-    blockExplorers: { default: { name: "GenLayer Explorer", url: env.explorer } },
+    blockExplorers: {
+      default: { name: "GenLayer Explorer", url: env.explorer },
+    },
   };
 }
 
@@ -155,7 +165,9 @@ async function buildChain(): Promise<Record<string, unknown>> {
 async function makeReadClient(): Promise<GenLayerSdkClient> {
   const { createClient } = await import("genlayer-js");
   const chain = await buildChain();
-  const client = createClient({ chain } as unknown as Parameters<typeof createClient>[0]);
+  const client = createClient({ chain } as unknown as Parameters<
+    typeof createClient
+  >[0]);
   return client as unknown as GenLayerSdkClient;
 }
 
@@ -170,13 +182,17 @@ async function makeWriteClient(): Promise<GenLayerSdkClient> {
   const { getWagmiConfig } = await import("./wagmiBridge");
   const config = getWagmiConfig();
   if (!config) {
-    throw new Error("No wallet connected. Use Connect Wallet in the header first.");
+    throw new Error(
+      "No wallet connected. Use Connect Wallet in the header first.",
+    );
   }
 
   const { getAccount, getWalletClient } = await import("wagmi/actions");
   const current = getAccount(config);
   if (!current.isConnected || !current.address) {
-    throw new Error("No wallet connected. Use Connect Wallet in the header first.");
+    throw new Error(
+      "No wallet connected. Use Connect Wallet in the header first.",
+    );
   }
   const walletClient = await getWalletClient(config);
 
@@ -232,11 +248,18 @@ function isRateLimit(err: unknown): boolean {
 }
 
 // One concurrency slot is acquired and released exactly once per attempt.
-async function fetchOnce(functionName: string, args: unknown[]): Promise<unknown> {
+async function fetchOnce(
+  functionName: string,
+  args: unknown[],
+): Promise<unknown> {
   await acquireSlot();
   try {
     const client = await readSdk();
-    return await client.readContract({ address: contractAddress(), functionName, args });
+    return await client.readContract({
+      address: contractAddress(),
+      functionName,
+      args,
+    });
   } finally {
     releaseSlot();
   }
@@ -244,7 +267,11 @@ async function fetchOnce(functionName: string, args: unknown[]): Promise<unknown
 
 // Backoff happens OUTSIDE the slot so a rate-limited read doesn't hold a
 // slot while it sleeps — that would starve the limiter and worsen the storm.
-async function fetchWithRetry(functionName: string, args: unknown[], attempt = 0): Promise<unknown> {
+async function fetchWithRetry(
+  functionName: string,
+  args: unknown[],
+  attempt = 0,
+): Promise<unknown> {
   try {
     return await fetchOnce(functionName, args);
   } catch (err) {
@@ -258,7 +285,10 @@ async function fetchWithRetry(functionName: string, args: unknown[], attempt = 0
   }
 }
 
-async function readRaw(functionName: string, args: unknown[]): Promise<unknown> {
+async function readRaw(
+  functionName: string,
+  args: unknown[],
+): Promise<unknown> {
   const key = functionName + JSON.stringify(args);
 
   const cached = readCache.get(key);
@@ -318,12 +348,21 @@ async function ensureBradburyChain(): Promise<void> {
 // pattern proven on the arbiq deployment) and fail loudly on bad outcomes.
 
 const SUCCESS_STATES = new Set(["ACCEPTED", "FINALIZED"]);
-const FAILURE_STATES = new Set(["UNDETERMINED", "CANCELED", "LEADER_TIMEOUT", "VALIDATORS_TIMEOUT"]);
+const FAILURE_STATES = new Set([
+  "UNDETERMINED",
+  "CANCELED",
+  "LEADER_TIMEOUT",
+  "VALIDATORS_TIMEOUT",
+]);
 
 const POLL_INTERVAL = 2_000;
 const DEFAULT_POLLS = 90; // ~3 min for deterministic ops
 const AI_POLLS = 150; // ~5 min — LLM-judged ops take the full consensus window
-const AI_WRITES = new Set(["create_challenge", "submit_evidence", "dispute_evidence"]);
+const AI_WRITES = new Set([
+  "create_challenge",
+  "submit_evidence",
+  "dispute_evidence",
+]);
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -331,9 +370,11 @@ function sleep(ms: number): Promise<void> {
 
 /** The (possibly array-wrapped) leader receipt of a transaction. */
 function leaderReceipt(tx: unknown): Record<string, unknown> | undefined {
-  const lr = (tx as { consensus_data?: { leader_receipt?: unknown } })?.consensus_data
-    ?.leader_receipt;
-  return (Array.isArray(lr) ? lr[0] : lr) as Record<string, unknown> | undefined;
+  const lr = (tx as { consensus_data?: { leader_receipt?: unknown } })
+    ?.consensus_data?.leader_receipt;
+  return (Array.isArray(lr) ? lr[0] : lr) as
+    | Record<string, unknown>
+    | undefined;
 }
 
 /**
@@ -354,9 +395,14 @@ function leaderErrorDetail(tx: unknown): string {
   const result = r.result as Record<string, unknown> | string | undefined;
   if (result && typeof result === "object") {
     const status = String(result.status ?? "");
-    if (status === "rollback" || status === "contract_error" || status === "error") {
+    if (
+      status === "rollback" ||
+      status === "contract_error" ||
+      status === "error"
+    ) {
       const payload = result.payload;
-      if (typeof payload === "string" && payload.trim()) return cleanMessage(payload);
+      if (typeof payload === "string" && payload.trim())
+        return cleanMessage(payload);
     }
   }
 
@@ -380,12 +426,17 @@ function cleanMessage(text: string): string {
 
 /** Did the tx execute the contract but revert (vs. succeed)? */
 function executionReverted(tx: unknown): boolean {
-  const t = tx as { txExecutionResultName?: unknown; txExecutionResult?: unknown };
+  const t = tx as {
+    txExecutionResultName?: unknown;
+    txExecutionResult?: unknown;
+  };
 
   // Public-testnet path: the SDK computes the execution-result enum.
-  const name = typeof t.txExecutionResultName === "string" ? t.txExecutionResultName : "";
+  const name =
+    typeof t.txExecutionResultName === "string" ? t.txExecutionResultName : "";
   if (name) return name === "FINISHED_WITH_ERROR";
-  if (t.txExecutionResult !== undefined) return Number(t.txExecutionResult) === 2;
+  if (t.txExecutionResult !== undefined)
+    return Number(t.txExecutionResult) === 2;
 
   // Studio path: read the decoded leader receipt's result status directly.
   const r = leaderReceipt(tx);
@@ -396,7 +447,10 @@ function executionReverted(tx: unknown): boolean {
     if (status) return status !== "return" && status !== "none";
   }
   const er = String(r?.execution_result ?? "").toUpperCase();
-  if (er) return er.includes("ERROR") || er.includes("ROLLBACK") || er.includes("REVERT");
+  if (er)
+    return (
+      er.includes("ERROR") || er.includes("ROLLBACK") || er.includes("REVERT")
+    );
 
   // Last resort: a non-empty extracted message means it reverted.
   return Boolean(leaderErrorDetail(tx));
@@ -456,17 +510,34 @@ async function waitForDecision(
     await sleep(POLL_INTERVAL);
   }
 
-  emitTxStatus({ txHash, functionName, status: lastStatus, done: true, ok: false });
-  throw new Error(`Timed out waiting for consensus on ${functionName} (tx ${txHash})`);
+  emitTxStatus({
+    txHash,
+    functionName,
+    status: lastStatus,
+    done: true,
+    ok: false,
+  });
+  throw new Error(
+    `Timed out waiting for consensus on ${functionName} (tx ${txHash})`,
+  );
 }
 
 // The write client is rebuilt per call: the connected account can change.
-async function write(functionName: string, args: unknown[], value = 0n): Promise<TxResult> {
+async function write(
+  functionName: string,
+  args: unknown[],
+  value = 0n,
+): Promise<TxResult> {
   try {
     await ensureBradburyChain();
     const client = await makeWriteClient();
 
-    const hash = await client.writeContract({ address: contractAddress(), functionName, args, value });
+    const hash = await client.writeContract({
+      address: contractAddress(),
+      functionName,
+      args,
+      value,
+    });
     const txHash = typeof hash === "string" ? hash : String(hash);
     const polls = AI_WRITES.has(functionName) ? AI_POLLS : DEFAULT_POLLS;
     await waitForDecision(txHash as `0x${string}`, functionName, polls);
@@ -549,7 +620,11 @@ async function fetchAllPaged(): Promise<Challenge[]> {
   const out: Challenge[] = [];
   let offset = 0;
   for (;;) {
-    const page = await readJson("get_challenges_page", [offset, PAGE_LIMIT], ChallengesPageSchema);
+    const page = await readJson(
+      "get_challenges_page",
+      [offset, PAGE_LIMIT],
+      ChallengesPageSchema,
+    );
     out.push(...page.challenges.map(adaptSummary));
     offset += PAGE_LIMIT;
     if (page.challenges.length === 0 || out.length >= page.total) break;
@@ -566,7 +641,11 @@ export function createGenLayerGrudgeClient(): GrudgeClient {
     mode: "genlayer",
 
     async getChallenge(id: string): Promise<Challenge> {
-      const raw = await readJson("get_challenge", [Number(id)], RawChallengeSchema);
+      const raw = await readJson(
+        "get_challenge",
+        [Number(id)],
+        RawChallengeSchema,
+      );
       return adaptChallenge(raw);
     },
 
@@ -583,37 +662,73 @@ export function createGenLayerGrudgeClient(): GrudgeClient {
       return ScreeningSchema.parse(await res.json());
     },
 
-    async createChallenge(input: CreateChallengeInput): Promise<{ id: string; txHash: string }> {
+    async createChallenge(
+      input: CreateChallengeInput,
+    ): Promise<{ id: string; txHash: string }> {
       const { txHash } = await write(
         "create_challenge",
-        [input.statement, input.evidencePolicy, input.category, input.durationDays, input.requiredProofs],
+        [
+          input.statement,
+          input.evidencePolicy,
+          input.category,
+          input.durationDays,
+          input.requiredProofs,
+        ],
         toUnits(input.selfStake),
       );
       // Resolve the new id with the cheapest read available: ids are
       // sequential from 1, so the page total IS the newest id. Refetching the
       // whole ledger here doubled the perceived create time — the challenge
       // page reads get_challenge by id right after navigation anyway.
-      const page = await readJson("get_challenges_page", [0, 1], ChallengesPageSchema);
+      const page = await readJson(
+        "get_challenges_page",
+        [0, 1],
+        ChallengesPageSchema,
+      );
       return { id: String(page.total), txHash };
     },
 
-    async stake(id: string, side: Side, amount: number, _from: string, taunt?: string): Promise<TxResult> {
+    async stake(
+      id: string,
+      side: Side,
+      amount: number,
+      _from: string,
+      taunt?: string,
+    ): Promise<TxResult> {
       return write("stake", [Number(id), side, taunt ?? ""], toUnits(amount));
     },
 
-    async submitEvidence(id: string, evidenceText: string): Promise<{ txHash: string; entry: EvidenceEntry }> {
-      const { txHash } = await write("submit_evidence", [Number(id), evidenceText]);
+    async submitEvidence(
+      id: string,
+      evidenceText: string,
+    ): Promise<{ txHash: string; entry: EvidenceEntry }> {
+      const { txHash } = await write("submit_evidence", [
+        Number(id),
+        evidenceText,
+      ]);
       const challenge = await this.getChallenge(id);
       const entry = challenge.evidence[challenge.evidence.length - 1];
-      if (!entry) throw new Error("Evidence was submitted but the verdict could not be read back.");
+      if (!entry)
+        throw new Error(
+          "Evidence was submitted but the verdict could not be read back.",
+        );
       return { txHash, entry };
     },
 
-    async disputeEvidence(id: string, evidenceIndex: number, counterEvidence: string) {
-      const { txHash } = await write("dispute_evidence", [Number(id), evidenceIndex, counterEvidence]);
+    async disputeEvidence(
+      id: string,
+      evidenceIndex: number,
+      counterEvidence: string,
+    ) {
+      const { txHash } = await write("dispute_evidence", [
+        Number(id),
+        evidenceIndex,
+        counterEvidence,
+      ]);
       const challenge = await this.getChallenge(id);
       const entry = challenge.evidence[evidenceIndex];
-      if (!entry) throw new Error("Dispute landed but the entry could not be read back.");
+      if (!entry)
+        throw new Error("Dispute landed but the entry could not be read back.");
       return { txHash, entry };
     },
 
@@ -647,15 +762,32 @@ export function createGenLayerGrudgeClient(): GrudgeClient {
     async getProfile(address: string): Promise<Profile> {
       // Derived client-side from the challenge list (read-model; chain is truth).
       const all = await getAll();
-      const mine = all.filter((c) => c.creator.toLowerCase() === address.toLowerCase());
+      const mine = all.filter(
+        (c) => c.creator.toLowerCase() === address.toLowerCase(),
+      );
       const kept = mine.filter((c) => c.status === "SUCCEEDED").length;
-      const broken = mine.filter((c) => c.status === "FAILED" || (c.status === "SETTLED" && c.verifiedCount < c.requiredProofs)).length;
+      const broken = mine.filter(
+        (c) =>
+          c.status === "FAILED" ||
+          (c.status === "SETTLED" && c.verifiedCount < c.requiredProofs),
+      ).length;
       const receipts = all
-        .filter((c) => c.status !== "ACTIVE" && c.verifiedCount < c.requiredProofs)
+        .filter(
+          (c) => c.status !== "ACTIVE" && c.verifiedCount < c.requiredProofs,
+        )
         .flatMap((c) =>
           c.stakes
-            .filter((s) => s.side === "doubt" && s.address.toLowerCase() === address.toLowerCase())
-            .map((s) => ({ challengeId: c.id, statement: c.statement, amount: s.amount, winnings: 0 })),
+            .filter(
+              (s) =>
+                s.side === "doubt" &&
+                s.address.toLowerCase() === address.toLowerCase(),
+            )
+            .map((s) => ({
+              challengeId: c.id,
+              statement: c.statement,
+              amount: s.amount,
+              winnings: 0,
+            })),
         );
       return {
         address,
@@ -663,7 +795,9 @@ export function createGenLayerGrudgeClient(): GrudgeClient {
         broken,
         earnings: 0,
         calledItReceipts: receipts,
-        currentStreak: mine.filter((c) => c.status === "ACTIVE").reduce((m, c) => Math.max(m, c.verifiedCount), 0),
+        currentStreak: mine
+          .filter((c) => c.status === "ACTIVE")
+          .reduce((m, c) => Math.max(m, c.verifiedCount), 0),
       };
     },
 
@@ -673,7 +807,11 @@ export function createGenLayerGrudgeClient(): GrudgeClient {
         mostUnbreakable: [],
         sharpestDoubters: [],
         biggestPots: all
-          .map((c) => ({ challengeId: c.id, statement: c.statement, pot: c.believerPool + c.doubterPool + c.selfStake }))
+          .map((c) => ({
+            challengeId: c.id,
+            statement: c.statement,
+            pot: c.believerPool + c.doubterPool + c.selfStake,
+          }))
           .sort((a, b) => b.pot - a.pot)
           .slice(0, 10),
       };
