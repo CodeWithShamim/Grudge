@@ -35,9 +35,14 @@ export async function verifyRequest(req: Request): Promise<VerifiedUser | null> 
   if (!privy) return null; // not configured → open (mock/dev)
 
   const auth = req.headers.get("authorization") ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
   if (!token) throw new Error("Missing Privy access token");
 
-  const claims = await privy.verifyAuthToken(token);
-  return { userId: claims.userId };
+  try {
+    const claims = await privy.verifyAuthToken(token);
+    return { userId: claims.userId };
+  } catch {
+    // never leak Privy's internal error shape to callers
+    throw new Error("Invalid or expired access token");
+  }
 }

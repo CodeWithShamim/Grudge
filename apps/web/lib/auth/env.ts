@@ -16,13 +16,19 @@ const AuthEnvSchema = z.object({
 
 export type AuthEnv = z.infer<typeof AuthEnvSchema>;
 
+// Env is static for the process lifetime, so parse once and cache. Avoids
+// re-running Zod on every render of AuthProviders / call site.
+let cachedEnv: AuthEnv | null | undefined;
+
 export function getAuthEnv(): AuthEnv | null {
+  if (cachedEnv !== undefined) return cachedEnv;
   const parsed = AuthEnvSchema.safeParse({
     privyAppId: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
     network: process.env.NEXT_PUBLIC_NETWORK,
     studioRpc: process.env.NEXT_PUBLIC_STUDIO_RPC,
   });
-  return parsed.success ? parsed.data : null;
+  cachedEnv = parsed.success ? parsed.data : null;
+  return cachedEnv;
 }
 
 export function isStudionet(): boolean {

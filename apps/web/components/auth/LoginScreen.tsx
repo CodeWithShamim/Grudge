@@ -1,8 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState, type FormEvent } from "react";
-import { useAuth } from "@/lib/auth";
+import { useState } from "react";
+import { useEmailLogin } from "@/lib/auth";
 import { DUR, EASE } from "@/lib/motion/tokens";
 
 /**
@@ -10,30 +10,31 @@ import { DUR, EASE } from "@/lib/motion/tokens";
  * enter email → enter the code Privy mails you. No wallet, no seed phrase.
  */
 export function LoginScreen({ onDone }: { onDone?: () => void }) {
-  const { emailState, sendCode, confirmCode } = useAuth();
+  const { step, codeRequested, sendCode, confirmCode } = useEmailLogin();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
-  // Which step to show — driven by USER actions, NOT Privy's transient state.
-  // A wrong code flips Privy's state to "error"; we must stay on the code step
-  // and just show the error, never bounce back to the email form.
-  const [codeSent, setCodeSent] = useState(false);
+  // Show the code form once a code has been requested locally OR Privy reports
+  // we're past the email step. A wrong code moves Privy to "error" but
+  // codeRequested stays true, so we never bounce back to the email form.
+  const [localSent, setLocalSent] = useState(false);
+  const codeSent = localSent || codeRequested;
 
-  const sending = emailState === "sending-code";
-  const submitting = emailState === "submitting-code";
+  const sending = step === "sending";
+  const submitting = step === "submitting";
 
-  const submitEmail = async (e: FormEvent) => {
+  const submitEmail = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     try {
       await sendCode(email.trim());
-      setCodeSent(true); // advance to the code step and stay there
+      setLocalSent(true); // advance to the code step and stay there
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't send the code. Try again.");
     }
   };
 
-  const submitCode = async (e: FormEvent) => {
+  const submitCode = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     try {
@@ -122,7 +123,7 @@ export function LoginScreen({ onDone }: { onDone?: () => void }) {
               <button
                 type="button"
                 onClick={() => {
-                  setCodeSent(false);
+                  setLocalSent(false);
                   setError(null);
                   setCode("");
                 }}
