@@ -59,6 +59,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Rate limited" }, { status: 429 });
   }
 
+  // NOTE: no auth gate here. This is a stateless pre-flight LLM screening
+  // helper that mutates nothing — the contract independently re-screens every
+  // statement on-chain in create_challenge. It's protected by rate-limiting,
+  // not by login, so an unauthenticated create wizard can still screen text.
+  // verifyRequest() is reserved for routes that mutate state / issue
+  // privileged actions.
+
   let body: z.infer<typeof BodySchema>;
   try {
     body = BodySchema.parse(await request.json());

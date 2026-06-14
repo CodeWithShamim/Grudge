@@ -32,7 +32,7 @@ const STEPS = [
   {
     n: "03",
     title: "Validators settle the truth",
-    body: "Submit evidence; GenLayer's validator LLMs reach consensus on whether it holds. The contract pays the winning side — automatically.",
+    body: "Submit evidence; GenLayer's validator LLMs reach consensus on whether it holds. The contract pays the winning side - automatically.",
     accent: "text-believe",
     border: "hover:border-believe/40",
   },
@@ -79,8 +79,7 @@ export function HowItWorks() {
         </motion.h2>
         <motion.p variants={pick(fadeRise)} className="mt-5 font-sans text-base leading-relaxed text-mut">
           GRUDGE turns a promise into an on-chain market. Stake on yourself, let the
-          doubters stake against you, and let validator consensus — not a referee —
-          decide who was right.
+          doubters stake against you, and let validator consensus - not a referee - decide who was right.
         </motion.p>
       </motion.div>
 

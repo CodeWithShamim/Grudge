@@ -16,7 +16,7 @@ import type {
  *
  * Implementations:
  *  - mock.ts      in-memory, zero-config, pixel-identical UI behavior
- *  - genlayer.ts  genlayer-js against Testnet Bradbury via the wagmi wallet
+ *  - genlayer.ts  genlayer-js against GenLayer via the Privy embedded wallet
  */
 export interface GrudgeClient {
   readonly mode: "mock" | "genlayer";

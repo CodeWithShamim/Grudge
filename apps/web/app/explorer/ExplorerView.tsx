@@ -105,7 +105,7 @@ export function ExplorerView() {
         <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.3em] text-gold">explorer</p>
         <h1 className="display-statement text-display-lg text-paper">Every grudge on the ledger</h1>
         <p className="mt-3 max-w-2xl font-sans text-base leading-relaxed text-mut">
-          Search and filter the full public record — promises kept, promises broken, and the bets riding on each.
+          Search and filter the full public record - promises kept, promises broken, and the bets riding on each.
         </p>
         {isLive && contractAddr && (
           <a

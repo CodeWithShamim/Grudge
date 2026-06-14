@@ -48,7 +48,7 @@ export function ProofGrid({ challenge, className }: { challenge: Challenge; clas
             variants={pick(fadeRise)}
             role="listitem"
             aria-label={`Day ${day}: ${entry ? entry.verdict : isToday ? "awaiting proof" : day < today ? "missed" : "upcoming"}`}
-            title={entry ? `Day ${day} — ${entry.verdict}: ${entry.reason}` : `Day ${day}`}
+            title={entry ? `Day ${day} - ${entry.verdict}: ${entry.reason}` : `Day ${day}`}
             className={cn(
               "flex aspect-square items-center justify-center rounded-chip font-mono text-[10px] font-bold",
               entry

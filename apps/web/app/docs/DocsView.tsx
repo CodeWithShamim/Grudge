@@ -72,8 +72,7 @@ export function DocsView() {
           Stake on your word. Let consensus settle it.
         </h1>
         <p className="mt-5 max-w-2xl font-sans text-base leading-relaxed text-mut">
-          GRUDGE is a social-accountability game on GenLayer. This guide covers the full loop —
-          from opening a grudge to claiming a payout — and the validator consensus that referees
+          GRUDGE is a social-accountability game on GenLayer. This guide covers the full loop - from opening a grudge to claiming a payout - and the validator consensus that referees
           every verdict.
         </p>
         <div className="mt-7 flex flex-wrap gap-3">
@@ -121,7 +120,7 @@ export function DocsView() {
             <Lead>
               GRUDGE turns a personal commitment into a public, on-chain market. You put GEN behind a
               promise; the crowd bets for or against you; and the truth is settled by validator
-              consensus — never a human referee.
+              consensus - never a human referee.
             </Lead>
             <ul className="ml-5 list-disc space-y-2 marker:text-gold">
               <li><span className="text-paper">Public commitment.</span> Every grudge, stake, taunt, and verdict is recorded on-chain and visible to anyone.</li>
@@ -135,7 +134,7 @@ export function DocsView() {
             <ol className="space-y-4">
               {[
                 ["Open a grudge", <>Write a concrete, time-boxed claim and an evidence policy, then back it with a GEN self-stake via <Term>create_challenge</Term>.</>],
-                ["Take a side", <>Anyone stakes <Term>believe</Term> or <Term>doubt</Term> — with an optional public taunt — through <Term>stake</Term>. The pools and odds move in real time.</>],
+                ["Take a side", <>Anyone stakes <Term>believe</Term> or <Term>doubt</Term> - with an optional public taunt - through <Term>stake</Term>. The pools and odds move in real time.</>],
                 ["Submit evidence", <>Post a proof with <Term>submit_evidence</Term>. Validators run the judging prompt and reach consensus on the verdict.</>],
                 ["Settle & claim", <>After the deadline, anyone calls <Term>settle</Term>; the contract credits the winners, who withdraw with <Term>claim</Term>.</>],
               ].map(([title, body], i) => (
@@ -152,8 +151,8 @@ export function DocsView() {
 
           <Section id="why-genlayer" title="Why GenLayer">
             <Lead>
-              The referee is a <span className="text-paper">subjective judgment</span> — “does this
-              evidence prove the promise?” — that no deterministic EVM contract or single oracle can
+              The referee is a <span className="text-paper">subjective judgment</span> - “does this
+              evidence prove the promise?” - that no deterministic EVM contract or single oracle can
               make trustlessly.
             </Lead>
             <p>
@@ -178,7 +177,7 @@ result = gl.eq_principle_prompt_comparative(
             <div className="grid gap-3 sm:grid-cols-2">
               {[
                 ["ACTIVE", "Open for stakes and evidence.", "text-gold"],
-                ["SUCCEEDED", "Required proofs verified — promise kept.", "text-believe"],
+                ["SUCCEEDED", "Required proofs verified - promise kept.", "text-believe"],
                 ["FAILED", "Deadline hit without enough proof.", "text-doubt"],
                 ["SETTLED", "Resolved; winnings credited to claim.", "text-mut"],
               ].map(([s, d, c]) => (
@@ -217,7 +216,7 @@ result = gl.eq_principle_prompt_comparative(
               <li><span className="text-paper">Self-stake.</span> The creator’s GEN, sent with <Term>create_challenge</Term>, is the line they’re defending.</li>
               <li><span className="text-paper">Believers</span> stake that the promise will be kept; <span className="text-paper">doubters</span> stake that it won’t.</li>
               <li><span className="text-paper">Settlement.</span> On <Term>settle</Term>, the winning side splits the losing pool proportionally to their stake; winners withdraw with <Term>claim</Term>.</li>
-              <li>A creator <span className="text-paper">cannot doubt their own grudge</span> — that’s just quitting.</li>
+              <li>A creator <span className="text-paper">cannot doubt their own grudge</span> - that’s just quitting.</li>
             </ul>
             <p className="text-mut">
               Amounts are denominated in GEN (18 decimals). On GenLayer Studio the network is feeless,
@@ -265,7 +264,7 @@ result = gl.eq_principle_prompt_comparative(
               {[
                 ["Who decides if I kept my promise?", <>No one person. The GenLayer validator set each runs the contract’s judging prompt and reaches consensus on the verdict. The result is on-chain and auditable.</>],
                 ["What stops someone faking evidence?", <>The judging prompt evaluates the proof against the grudge’s evidence policy, and prompt-injection attempts are adjudicated by the same consensus and rejected. A verified entry can still be disputed.</>],
-                ["Do I need GEN to play?", <>To create a grudge or stake, yes — those calls carry value. On GenLayer Studio the network is feeless, so reading and browsing cost nothing. Fund a Studio account with the simulator’s <Term>sim_fundAccount</Term> method.</>],
+                ["Do I need GEN to play?", <>To create a grudge or stake, yes - those calls carry value. On GenLayer Studio the network is feeless, so reading and browsing cost nothing. Fund a Studio account with the simulator’s <Term>sim_fundAccount</Term> method.</>],
                 ["Can I try it without a wallet?", <>Yes. The app ships a zero-config mock mode with seeded grudges so you can play the whole loop locally before connecting to a real network.</>],
               ].map(([q, a], i) => (
                 <div key={i} className="rounded-card border border-ink-line bg-ink-soft p-5">

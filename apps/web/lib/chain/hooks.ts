@@ -40,7 +40,7 @@ if (typeof window !== "undefined") {
       toast.dismiss(id);
       return;
     }
-    toast.loading(`${functionName.replace(/_/g, " ")} — ${status.toLowerCase()}`, {
+    toast.loading(`${functionName.replace(/_/g, " ")} - ${status.toLowerCase()}`, {
       id,
       description: `tx ${txHash.slice(0, 10)}…${txHash.slice(-6)}`,
     });
@@ -136,7 +136,7 @@ export function useStake(challengeId: string) {
     },
     onError: (e, _vars, ctx) => {
       if (ctx?.prev) qc.setQueryData(qk.challenge(challengeId), ctx.prev);
-      errToast("Stake failed — rolled back", e);
+      errToast("Stake failed - rolled back", e);
     },
     onSuccess: ({ txHash }, vars) => {
       txToast(vars.side === "doubt" ? "Doubt recorded. It's public now." : "Belief recorded.", txHash);

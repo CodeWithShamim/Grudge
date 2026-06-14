@@ -6,9 +6,9 @@ import { getChainMode } from "@/lib/chain/client";
 import { useViewer } from "@/lib/chain/hooks";
 import { shortAddress } from "@/lib/utils";
 
-// RainbowKit's ConnectButton only ships in genlayer mode (code-split).
-const ConnectButton = dynamic(
-  () => import("@rainbow-me/rainbowkit").then((m) => m.ConnectButton),
+// Email/embedded-wallet account chip only ships in genlayer mode (code-split).
+const AccountChip = dynamic(
+  () => import("@/components/auth/AccountChip").then((m) => m.AccountChip),
   { ssr: false, loading: () => <div className="skeleton h-9 w-32" /> },
 );
 
@@ -38,10 +38,10 @@ export function Header() {
             Hold a grudge
           </Link>
           {mode === "genlayer" ? (
-            <ConnectButton showBalance={false} chainStatus="icon" accountStatus="address" />
+            <AccountChip />
           ) : (
             <span
-              title="Mock mode — set NEXT_PUBLIC_CHAIN_MODE=genlayer to use GenLayer Studio"
+              title="Mock mode - set NEXT_PUBLIC_CHAIN_MODE=genlayer to use Privy email login"
               className="rounded-control border border-dashed border-mut/50 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-mut"
             >
               {shortAddress(address)} · demo

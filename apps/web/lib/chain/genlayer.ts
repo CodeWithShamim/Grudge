@@ -18,11 +18,11 @@ import {
 } from "./types";
 
 /**
- * genlayer-js adapter against Testnet Bradbury.
+ * genlayer-js adapter against GenLayer (studionet / Bradbury).
  *
  * This is the ONLY file that touches genlayer-js. Writes sign through the
- * wagmi wallet client of the connector RainbowKit connected — keys never
- * leave the wallet; genlayer-js signs through that single provider.
+ * Privy EMBEDDED wallet's viem client (registered in authBridge) — the key is
+ * custodied by Privy, so signing is silent (no MetaMask, no popup).
  */
 
 const GEN_DECIMALS = 18n;
@@ -172,36 +172,25 @@ async function makeReadClient(): Promise<GenLayerSdkClient> {
 }
 
 /**
- * Write client — signs through ONE provider: the wagmi wallet client of the
- * ACTIVE RainbowKit connector (injected, WalletConnect, Coinbase, …), the
- * same single provider path proven on the arbiq deployment. No
- * `window.ethereum` fallback — a blind grab can sign with a different wallet
- * than the one the user connected.
+ * Write client — signs through the Privy EMBEDDED wallet (key custodied by
+ * Privy, no MetaMask, no popup). The auth layer registers the embedded viem
+ * WalletClient into authBridge once the user is logged in; genlayer-js sends
+ * the write as a standard EVM tx to the consensus contract through that
+ * provider, signed silently.
  */
 async function makeWriteClient(): Promise<GenLayerSdkClient> {
-  const { getWagmiConfig } = await import("./wagmiBridge");
-  const config = getWagmiConfig();
-  if (!config) {
-    throw new Error(
-      "No wallet connected. Use Connect Wallet in the header first.",
-    );
+  const { getEmbeddedSigner } = await import("./authBridge");
+  const signer = getEmbeddedSigner();
+  if (!signer) {
+    throw new Error("Sign in with your email to continue.");
   }
-
-  const { getAccount, getWalletClient } = await import("wagmi/actions");
-  const current = getAccount(config);
-  if (!current.isConnected || !current.address) {
-    throw new Error(
-      "No wallet connected. Use Connect Wallet in the header first.",
-    );
-  }
-  const walletClient = await getWalletClient(config);
 
   const { createClient } = await import("genlayer-js");
   const chain = await buildChain();
   const client = createClient({
     chain,
-    account: current.address,
-    provider: walletClient,
+    account: signer.address,
+    provider: signer.provider,
   } as unknown as Parameters<typeof createClient>[0]);
   return client as unknown as GenLayerSdkClient;
 }
@@ -312,33 +301,8 @@ async function readRaw(
   return promise;
 }
 
-/**
- * Make sure the CONNECTED wallet is on Bradbury before signing.
- *
- * Never use genlayer-js's client.connect() here: it talks to window.ethereum
- * directly, so with several wallet extensions installed it opens the wrong
- * one (e.g. MetaMask while Keplr is the connected wallet). wagmi's
- * switchChain routes the switch/add request through the ACTIVE connector —
- * the same wallet that will sign the tx.
- */
-async function ensureBradburyChain(): Promise<void> {
-  const { getWagmiConfig } = await import("./wagmiBridge");
-  const config = getWagmiConfig();
-  const env = getBradburyEnv();
-  if (!config || !env) return;
-
-  const { getAccount, switchChain } = await import("wagmi/actions");
-  const current = getAccount(config);
-  if (!current.isConnected || current.chainId === env.chainId) return;
-
-  try {
-    await switchChain(config, { chainId: env.chainId });
-  } catch (e) {
-    throw new Error(
-      `Switch your wallet to GenLayer Studio to continue (${e instanceof Error ? e.message : "switch rejected"})`,
-    );
-  }
-}
+// No network-switch guard: the Privy embedded wallet is provisioned directly
+// on the configured GenLayer chain, so there is nothing to switch.
 
 // ── consensus wait ──────────────────────────────────────────────────────
 // The SDK's waitForTransactionReceipt(status: "ACCEPTED") is unusable here:
@@ -529,7 +493,6 @@ async function write(
   value = 0n,
 ): Promise<TxResult> {
   try {
-    await ensureBradburyChain();
     const client = await makeWriteClient();
 
     const hash = await client.writeContract({

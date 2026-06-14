@@ -13,9 +13,9 @@ export const SITE_URL = (
 export const SITE = {
   name: "GRUDGE",
   tagline: "your friends bet you'll fail",
-  title: "GRUDGE — your friends bet you'll fail",
+  title: "GRUDGE - your friends bet you'll fail",
   description:
-    "GRUDGE is a social-accountability game on GenLayer. Stake GEN on a public promise, let doubters bet against you, and let validator-LLM consensus settle whether you kept your word — every receipt on-chain.",
+    "GRUDGE is a social-accountability game on GenLayer. Stake GEN on a public promise, let doubters bet against you, and let validator-LLM consensus settle whether you kept your word - every receipt on-chain.",
   shortDescription: "Stake on yourself. Let them doubt you publicly. GenLayer validator consensus is the referee.",
   url: SITE_URL,
   twitter: "@genlayer",

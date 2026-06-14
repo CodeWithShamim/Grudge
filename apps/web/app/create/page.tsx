@@ -93,7 +93,7 @@ export default function CreatePage() {
         {step === 0 && (
           <motion.section key="s0" variants={variants} initial="enter" animate="center" exit="exit">
             <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-mut" htmlFor="statement">
-              The promise — concrete, measurable, time-boxed
+              The promise - concrete, measurable, time-boxed
             </label>
             <textarea
               id="statement"
@@ -148,7 +148,7 @@ export default function CreatePage() {
           <motion.section key="s1" variants={variants} initial="enter" animate="center" exit="exit" className="space-y-6">
             <div>
               <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-mut" htmlFor="policy">
-                Evidence policy — what counts as proof?
+                Evidence policy - what counts as proof?
               </label>
               <textarea
                 id="policy"
@@ -195,7 +195,7 @@ export default function CreatePage() {
         {step === 2 && (
           <motion.section key="s2" variants={variants} initial="enter" animate="center" exit="exit" className="space-y-6">
             <NumberField
-              label={`Your self-stake (GEN) — you lose it if you fold (min ${MIN_STAKE_GEN})`}
+              label={`Your self-stake (GEN) - you lose it if you fold (min ${MIN_STAKE_GEN})`}
               value={selfStake}
               onChange={setSelfStake}
               min={MIN_STAKE_GEN}

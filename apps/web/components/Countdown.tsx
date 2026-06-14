@@ -22,7 +22,7 @@ export function Countdown({ endsAt, className }: { endsAt: number; className?: s
   if (done) {
     return (
       <span className={cn("font-mono text-sm uppercase tracking-widest text-gold", className)}>
-        time&apos;s up — settle it
+        time&apos;s up - settle it
       </span>
     );
   }

@@ -90,7 +90,7 @@ export function Hero() {
             className="mx-auto mt-6 max-w-md font-sans text-base leading-relaxed text-mut lg:mx-0"
           >
             Stake GEN on a promise. Let the doubters stake against you. Every claim is
-            judged by GenLayer validator consensus — and the receipt is public forever.
+            judged by GenLayer validator consensus - and the receipt is public forever.
           </motion.p>
 
           <motion.div
@@ -138,7 +138,7 @@ export function Hero() {
       </div>
 
       <p className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 animate-breathe font-mono text-[10px] uppercase tracking-widest text-mut">
-        scroll — watch a promise get judged ↓
+        scroll - watch a promise get judged ↓
       </p>
     </section>
   );

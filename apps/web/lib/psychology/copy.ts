@@ -2,7 +2,7 @@ import type { Challenge } from "../chain/types";
 import { shortAddress } from "../utils";
 
 /**
- * The GRUDGE psychology engine — pure, deterministic, unit-tested copy.
+ * The GRUDGE psychology engine - pure, deterministic, unit-tested copy.
  *
  * Voice: a grudge ledger. Playful trash-talk, never abusive. No
  * body-shaming, no harassment, profanity-free. Every line should make
@@ -20,7 +20,7 @@ export function oddsLine(c: Pick<Challenge, "believerPool" | "doubterPool" | "se
   if (ratio >= 3) return `${amt} GEN says this is a fantasy.`;
   if (ratio >= 1.5) return `${amt} GEN is betting on collapse.`;
   if (ratio >= 0.75) return `${amt} GEN says they fold. Dead heat.`;
-  if (ratio >= 0.25) return `${amt} GEN of doubt — the believers are winning.`;
+  if (ratio >= 0.25) return `${amt} GEN of doubt - the believers are winning.`;
   return `Only ${amt} GEN of doubt. Cowards, or smart money?`;
 }
 
@@ -39,7 +39,7 @@ export function streakNudge(c: Pick<Challenge, "verifiedCount" | "stakes">): str
   return `Day ${day}. ${who}'s ${amt} GEN is sweating through the ledger.`;
 }
 
-/** Banner when evidence gets REJECTED — blood in the water for doubters. */
+/** Banner when evidence gets REJECTED - blood in the water for doubters. */
 export function rejectionBanner(creatorName: string): string {
   return `${creatorName} just had evidence REJECTED. The doubters smell blood.`;
 }
@@ -71,15 +71,15 @@ export function shareCaption(
     case "rejected":
       return `Their "evidence" got REJECTED by consensus. The doubters were right.`;
     case "won":
-      return `"${c.statement}" — DONE. ${doubt} GEN of doubt, collected. Receipts are public.`;
+      return `"${c.statement}" - DONE. ${doubt} GEN of doubt, collected. Receipts are public.`;
     case "calledIt":
-      return `Called it. "${c.statement}" — broken. My receipt is on the ledger forever.`;
+      return `Called it. "${c.statement}" - broken. My receipt is on the ledger forever.`;
   }
 }
 
 /** Empty-state lines. */
 export const EMPTY_STATES = {
-  feed: "No grudges yet. Start one — or doubt someone braver.",
+  feed: "No grudges yet. Start one - or doubt someone braver.",
   evidence: "No proof yet. The doubters are getting comfortable.",
   doubters: "Nobody has doubted this. Be the first villain.",
   receipts: "No receipts. You haven't called anyone's bluff yet.",

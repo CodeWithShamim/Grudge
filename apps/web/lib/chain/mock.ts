@@ -332,7 +332,7 @@ export function createMockGrudgeClient(): GrudgeClient {
         throw new Error("You can't doubt yourself. That's just journaling.");
       }
       const stakingCloses = c.startsAt + (c.endsAt - c.startsAt) * 0.25;
-      if (Date.now() > stakingCloses) throw new Error("Staking window closed — odds are locked.");
+      if (Date.now() > stakingCloses) throw new Error("Staking window closed - odds are locked.");
       c.stakes.push({ address: from, side, amount, taunt, at: Date.now() });
       recountPools(c);
       return { txHash: fakeTxHash() };
@@ -342,7 +342,7 @@ export function createMockGrudgeClient(): GrudgeClient {
       const c = must(id);
       if (c.creator.toLowerCase() !== from.toLowerCase()) throw new Error("Only the challenger submits evidence.");
       if (c.status !== "ACTIVE") throw new Error("This grudge is closed.");
-      if (Date.now() >= c.endsAt) throw new Error("Deadline passed — settle the challenge.");
+      if (Date.now() >= c.endsAt) throw new Error("Deadline passed - settle the challenge.");
       // Latency here is intentional: the validator-arc animation plays over it.
       await delay(900);
       const result = (await remoteJudge("evidence", {

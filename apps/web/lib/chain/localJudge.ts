@@ -42,7 +42,7 @@ export function judgeEvidenceLocally(evidenceText: string): JudgeResult {
   }
   return {
     verdict: "SUSPICIOUS",
-    reason: "Plausible but vague — specifics, numbers or links are missing.",
+    reason: "Plausible but vague - specifics, numbers or links are missing.",
     confidence: 55,
   };
 }

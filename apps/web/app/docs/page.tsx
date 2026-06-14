@@ -38,7 +38,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Why does GRUDGE need GenLayer?",
-    a: "The referee is a subjective judgment — does this evidence prove the promise? — that no deterministic smart contract or single oracle can make trustlessly. GenLayer Intelligent Contracts run that judgment inside validator consensus, so the verdict is a consensus artifact rather than one model's opinion.",
+    a: "The referee is a subjective judgment - does this evidence prove the promise? - that no deterministic smart contract or single oracle can make trustlessly. GenLayer Intelligent Contracts run that judgment inside validator consensus, so the verdict is a consensus artifact rather than one model's opinion.",
   },
 ];
 

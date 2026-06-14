@@ -97,7 +97,7 @@ export default function ComponentGallery() {
         </div>
       </Section>
 
-      <Section title="Buttons (press 0.97 + spring) — all states">
+      <Section title="Buttons (press 0.97 + spring) - all states">
         <div className="flex flex-wrap gap-3">
           <Button>Primary</Button>
           <Button variant="believe">Believe</Button>
@@ -110,7 +110,7 @@ export default function ComponentGallery() {
       </Section>
 
       <Section title="Empty state">
-        <EmptyState line="No grudges yet. Start one — or doubt someone braver." />
+        <EmptyState line="No grudges yet. Start one - or doubt someone braver." />
       </Section>
     </div>
   );

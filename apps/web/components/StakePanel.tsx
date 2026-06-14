@@ -136,7 +136,7 @@ export function StakePanel({
                 className="overflow-hidden"
               >
                 <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-mut">
-                  Attach a taunt — it goes on the public record
+                  Attach a taunt - it goes on the public record
                 </p>
                 <textarea
                   value={taunt}
@@ -150,7 +150,7 @@ export function StakePanel({
           </AnimatePresence>
 
           {windowClosed ? (
-            <p className="font-mono text-xs text-gold">Staking window closed — odds are locked.</p>
+            <p className="font-mono text-xs text-gold">Staking window closed - odds are locked.</p>
           ) : (
             <Button
               variant={side === "believe" ? "believe" : "doubt"}
@@ -161,8 +161,8 @@ export function StakePanel({
               onClick={commit}
             >
               {side === "believe"
-                ? `Back them with ${valid ? effectiveAmount : "—"} GEN`
-                : `Bet ${valid ? effectiveAmount : "—"} GEN they fail`}
+                ? `Back them with ${valid ? effectiveAmount : " - "} GEN`
+                : `Bet ${valid ? effectiveAmount : " - "} GEN they fail`}
             </Button>
           )}
           {isDemo && (
