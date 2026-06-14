@@ -14,6 +14,7 @@ import { CodeBlock } from "./CodeBlock";
 const SECTIONS = [
   { id: "overview", label: "Overview" },
   { id: "how-it-works", label: "How it works" },
+  { id: "signing-in", label: "Signing in" },
   { id: "why-genlayer", label: "Why GenLayer" },
   { id: "lifecycle", label: "Grudge lifecycle" },
   { id: "verdicts", label: "Verdicts & disputes" },
@@ -149,6 +150,23 @@ export function DocsView() {
             </ol>
           </Section>
 
+          <Section id="signing-in" title="Signing in">
+            <Lead>
+              No wallet extension, no seed phrase, no transaction popups. You sign in with an
+              email and a one-time code — and an on-chain wallet is created for you automatically.
+            </Lead>
+            <ul className="ml-5 list-disc space-y-2 marker:text-gold">
+              <li><span className="text-paper">Email login.</span> Enter your email, then the code we send you. That’s it — no app to install.</li>
+              <li><span className="text-paper">Embedded wallet.</span> On first login an embedded wallet is provisioned and its key is securely custodied, so every action signs <span className="text-paper">silently</span> — no confirmation dialog, no fee prompt.</li>
+              <li><span className="text-paper">Funded to start.</span> On GenLayer Studio your wallet is auto-funded with test GEN the first time it’s empty, so you can act within seconds.</li>
+              <li><span className="text-paper">You stay in control.</span> Export your wallet any time from the account menu — you’re never locked in.</li>
+            </ul>
+            <p className="text-mut">
+              Browsing the ledger needs no account; only actions that put GEN on-chain (create,
+              stake, evidence, dispute, settle, claim) require signing in.
+            </p>
+          </Section>
+
           <Section id="why-genlayer" title="Why GenLayer">
             <Lead>
               The referee is a <span className="text-paper">subjective judgment</span> - “does this
@@ -246,7 +264,10 @@ result = gl.eq_principle_prompt_comparative(
                     ["dispute_evidence(challenge_id, index, counter)", "write", "Challenge a VERIFIED entry; consensus re-judges."],
                     ["settle(challenge_id)", "write", "After the deadline, resolve and credit winners."],
                     ["claim()", "write", "Withdraw your settled winnings."],
-                    ["get_challenge / get_open_challenges / get_challenges_page / get_claimable", "view", "Read-only chain queries."],
+                    ["get_challenges_page(offset, limit)", "view", "Paginated summaries — the only list read (bounded, no nested arrays)."],
+                    ["get_challenge / get_challenge_summary", "view", "Full or bounded single-challenge read."],
+                    ["get_stakes_page / get_evidence_page", "view", "Paginate one challenge's stakes / evidence."],
+                    ["get_claimable(address) / get_solvency()", "view", "Withdrawable balance · contract liability invariant."],
                   ].map(([m, k, p]) => (
                     <tr key={m} className="align-top">
                       <td className="px-4 py-3 font-mono text-[12px] text-paper/90">{m}</td>
@@ -262,10 +283,12 @@ result = gl.eq_principle_prompt_comparative(
           <Section id="faq" title="FAQ">
             <div className="space-y-5">
               {[
+                ["How do I sign in?", <>With your email. Enter it, type the one-time code we send you, and an on-chain wallet is created for you automatically — no extension, no seed phrase.</>],
+                ["Do I have to confirm every transaction?", <>No. Your embedded wallet signs silently, so creating, staking, submitting evidence, settling, and claiming all happen without a popup or fee prompt.</>],
                 ["Who decides if I kept my promise?", <>No one person. The GenLayer validator set each runs the contract’s judging prompt and reaches consensus on the verdict. The result is on-chain and auditable.</>],
                 ["What stops someone faking evidence?", <>The judging prompt evaluates the proof against the grudge’s evidence policy, and prompt-injection attempts are adjudicated by the same consensus and rejected. A verified entry can still be disputed.</>],
-                ["Do I need GEN to play?", <>To create a grudge or stake, yes - those calls carry value. On GenLayer Studio the network is feeless, so reading and browsing cost nothing. Fund a Studio account with the simulator’s <Term>sim_fundAccount</Term> method.</>],
-                ["Can I try it without a wallet?", <>Yes. The app ships a zero-config mock mode with seeded grudges so you can play the whole loop locally before connecting to a real network.</>],
+                ["Do I need GEN to play?", <>To create a grudge or stake, yes - those calls carry value. On GenLayer Studio your wallet is auto-funded with test GEN, so you start ready. Reading and browsing the ledger cost nothing and need no sign-in.</>],
+                ["Can I try it without signing in?", <>Yes. The app ships a zero-config mock mode with seeded grudges, so you can play the whole loop locally before connecting to a real network.</>],
               ].map(([q, a], i) => (
                 <div key={i} className="rounded-card border border-ink-line bg-ink-soft p-5">
                   <p className="font-display uppercase italic tracking-wide text-paper">{q}</p>

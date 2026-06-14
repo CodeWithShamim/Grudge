@@ -10,7 +10,7 @@ Let believers back you and doubters bet against you. Submit evidence — and let
 
 Every doubt recorded · every receipt public · refereed by GenLayer validator consensus.
 
-[Quickstart](#quickstart) · [How it works](#how-it-works) · [Architecture](#architecture) · [Deploy to GenLayer](#deploy-to-genlayer) · [Quality gates](#quality-gates)
+[Quickstart](#quickstart) · [How it works](#how-it-works) · [Sign-in](#sign-in--silent-signing) · [Architecture](#architecture) · [Deploy](#deploy-to-genlayer) · [Quality gates](#quality-gates)
 
 </div>
 
@@ -29,7 +29,7 @@ GRUDGE turns a personal commitment into a public, on-chain market.
 
 The referee is a **subjective judgment** — _"does this evidence actually prove the promise?"_ — that no deterministic EVM contract or single oracle can make trustlessly.
 
-GenLayer's Intelligent Contracts run that judgment _inside consensus_: `gl.eq_principle_prompt_comparative` has the validator set each execute the judging prompt and agree on the verdict, so the outcome is a **consensus artifact**, not one model's opinion. Prompt-injection attempts inside submitted evidence are adjudicated by that same consensus and auto-`REJECTED`.
+GenLayer's Intelligent Contracts run that judgment _inside consensus_: `gl.eq_principle.prompt_comparative` has the validator set each execute the judging prompt and agree on the verdict, so the outcome is a **consensus artifact**, not one model's opinion. Prompt-injection attempts inside submitted evidence are adjudicated by that same consensus and auto-`REJECTED`.
 
 > No other chain can settle _"did you actually do the thing?"_ without trusting a human.
 
@@ -47,13 +47,33 @@ create_challenge ──▶ stake (believe / doubt) ──▶ submit_evidence ─
 
 The chain is the single source of truth. The web app holds **no** authoritative state.
 
+## Sign-in & silent signing
+
+GRUDGE has **no wallet extension, no seed phrase, no transaction popups**. Auth is
+**email + a one-time code** (Privy), and on first login Privy provisions an
+**embedded wallet** whose key it custodies — so every write (`create`, `stake`,
+`submit_evidence`, `dispute`, `settle`, `claim`) signs **silently**, with no fee
+confirmation.
+
+- On **studionet** the embedded wallet is **auto-funded** with simulated GEN the
+  first time it's empty, so a new user can act seconds after signing in.
+- On **Bradbury** (real testnet GEN) there is **no auto-fund** — the UI surfaces
+  the faucet, and value actions get an in-app confirm.
+
+`lib/auth/` is the only place that touches Privy; the rest of the app consumes
+`useAuth()` / `useEmailLogin()`. See [`apps/web/AUTH.md`](apps/web/AUTH.md) for the
+full model (where the key lives, server token verification, the studionet-vs-Bradbury
+boundary). A CI guard (`pnpm guard:wallet`) fails the build if any
+`wagmi` / `@rainbow-me/rainbowkit` / `window.ethereum` reference returns — the
+embedded wallet is the only signer.
+
 ## Quickstart
 
 Zero config — boots on an in-memory mock chain with seeded grudges, so the full
-loop is playable immediately.
+loop is playable immediately (no Privy, no wallet, no network).
 
 ```sh
-pnpm i && pnpm dev          # http://localhost:3000
+pnpm i && pnpm dev          # http://localhost:3000  (CHAIN_MODE=mock)
 ```
 
 **Requirements:** Node ≥ 20, pnpm 10.
@@ -66,15 +86,21 @@ without it a deterministic heuristic keeps everything zero-config.
 ## Architecture
 
 ```
-apps/web/                 Next.js 15 App Router · TS strict · Tailwind · Framer Motion
-  app/(marketing)/        landing: hero (live ledger) → how-it-works → live feed
-  app/docs/               in-app documentation page
+apps/web/                 Next.js 15 App Router · React 19 · TS strict · Tailwind · Framer Motion
+  app/(marketing)/        landing: hero (live market) → how-it-works → live feed
+  app/explorer/           browse/search every grudge (paginated, all statuses)
+  app/docs/               in-app documentation page (+ FAQ structured data)
   app/challenge/[id]/     challenge detail: tug-of-war, evidence tribunal, settle
   app/create/             create-challenge wizard (pre-flight LLM screening)
+  app/api/judge/          stateless screening/judge proxy — SAME prompt as the contract
+
+  lib/auth/               ONLY Privy touchpoint: useAuth, useEmailLogin, server verify
   lib/chain/              ONE adapter interface (GrudgeClient): mock.ts ⇄ genlayer.ts
+    authBridge.ts         embedded-wallet provider → genlayer-js (plain TS, no React)
+    fund.ts               studionet-only auto-fund (balance-gated; Bradbury tripwire)
   lib/motion/             motion tokens + variants (single reduced-motion gate)
   lib/psychology/         pure, unit-tested copy engine (odds lines, nudges, captions)
-  app/api/judge/          mock judge proxy — SAME prompt as the contract
+  lib/seo.ts              SEO/AEO config (metadata, OG, sitemap, JSON-LD)
 
 contracts/
   grudge.py               GenVM Intelligent Contract
@@ -82,7 +108,9 @@ contracts/
 ```
 
 Every chain access in the app goes through a `GrudgeClient`; components never
-touch `genlayer-js` or `viem` directly. Mock mode ships **no** wallet/chain JS.
+touch `genlayer-js` or `viem` directly, and the embedded signer reaches the
+adapter through `authBridge` (no React imports in the chain layer). Mock mode
+ships **no** auth/chain JS.
 
 ### Contract surface (`contracts/grudge.py`)
 
@@ -94,7 +122,13 @@ touch `genlayer-js` or `viem` directly. Mock mode ships **no** wallet/chain JS.
 | `dispute_evidence(challenge_id, index, counter_evidence)` | `write` | Challenge a `VERIFIED` entry; consensus re-judges. |
 | `settle(challenge_id)` | `write` | After the deadline, resolve and credit winners' ledgers. |
 | `claim()` | `write` | Withdraw your settled winnings. |
-| `get_challenge`, `get_open_challenges`, `get_challenges_page`, `get_claimable` | `view` | Read-only chain queries. |
+| `get_challenge` · `get_challenge_summary` | `view` | Full / bounded single-challenge reads. |
+| `get_challenges_page(offset, limit)` | `view` | Paginated **summaries** (no nested arrays) — the only list read. |
+| `get_stakes_page` · `get_evidence_page` | `view` | Paginate a single challenge's stakes / evidence. |
+| `get_claimable(address)` · `get_solvency()` | `view` | Withdrawable balance · contract liability invariant. |
+
+> All list/detail reads are **bounded** — there is no unbounded view, so views
+> never revert as the ledger grows.
 
 ## Deploy to GenLayer
 
@@ -111,27 +145,36 @@ Then set `apps/web/.env.local` (see `apps/web/.env.example`):
 
 ```sh
 NEXT_PUBLIC_CHAIN_MODE=genlayer
-NEXT_PUBLIC_BRADBURY_CHAIN_ID=61999                       # Studio (Bradbury: 4221)
-NEXT_PUBLIC_BRADBURY_RPC=https://studio.genlayer.com/api
-NEXT_PUBLIC_BRADBURY_EXPLORER=https://studio.genlayer.com
-NEXT_PUBLIC_GRUDGE_CONTRACT_ADDRESS=0x…                   # from the deploy step
-NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=                     # optional (injected-wallet dev)
+
+# Auth (Privy) — create an app at https://dashboard.privy.io:
+#   • enable Email login • embedded wallets: create on login • whitelist your origins
+NEXT_PUBLIC_PRIVY_APP_ID=...
+PRIVY_APP_SECRET=...                        # server-only — never NEXT_PUBLIC
+
+# Network + chain (read by lib/chain/bradbury.ts)
+NEXT_PUBLIC_NETWORK=studionet               # studionet (auto-fund) | bradbury (faucet)
+NEXT_PUBLIC_STUDIO_RPC=https://studio.genlayer.com/api
+NEXT_PUBLIC_CHAIN_ID=61999                  # Studio (Bradbury: 4221)
+NEXT_PUBLIC_RPC=https://studio.genlayer.com/api
+NEXT_PUBLIC_EXPLORER=https://explorer-studio.genlayer.com
+NEXT_PUBLIC_GRUDGE_CONTRACT_ADDRESS=0x…     # from the deploy step
 ```
 
-In `genlayer` mode the header shows a RainbowKit **Connect Wallet** button;
-writes sign through the connected wallet, and tx toasts link to the explorer.
-On Studio, fund your account from the simulator before a value-carrying write:
+In `genlayer` mode the header shows an **email Sign-in** chip; after sign-in the
+embedded wallet signs every write silently and tx toasts link to the explorer.
+On studionet the wallet auto-funds when empty; to fund manually:
 
 ```sh
 curl -X POST https://studio.genlayer.com/api -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"sim_fundAccount","params":["0xYOUR_ADDRESS", 500000000000000000000],"id":1}'
-#                                                            └ amount is in wei (500 GEN)
+  -d '{"jsonrpc":"2.0","method":"sim_fundAccount","params":["0xYOUR_ADDRESS", 1000000000000000000000],"id":1}'
+#                                                            └ amount is a wei NUMBER (1000 GEN)
 ```
 
 ## Quality gates
 
 ```sh
-pnpm typecheck && pnpm lint && pnpm test     # web: TS strict, ESLint, vitest
+pnpm typecheck && pnpm lint && pnpm test     # web: TS strict, ESLint, vitest, wallet-lib guard
+pnpm guard:wallet                             # fail if wagmi/rainbowkit/window.ethereum return
 pnpm e2e                                      # Playwright core-loop (mock mode)
 make -C contracts lint                        # ruff --select ALL, mypy --strict, genvm_lint.py
 make -C contracts test                        # settle-math units + gltest --network studionet
@@ -146,7 +189,8 @@ storage writes in nondet blocks, no banned imports, and
 ## Tech stack
 
 - **Frontend** — Next.js 15 (App Router), React 19, TypeScript (strict), Tailwind CSS, Framer Motion
-- **Wallet / chain** — `genlayer-js`, wagmi, RainbowKit, viem
+- **Auth / wallet** — Privy (`@privy-io/react-auth` + `@privy-io/server-auth`) email login + embedded wallet
+- **Chain** — `genlayer-js`, viem (signing only, via the embedded provider)
 - **Data** — TanStack Query, Zod (schema-validated chain reads)
 - **Contract** — Python GenVM Intelligent Contract on GenLayer
 - **Tooling** — pnpm workspaces, Vitest, Playwright, ESLint, ruff, mypy
