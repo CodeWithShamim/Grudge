@@ -14,16 +14,20 @@ export function LoginScreen({ onDone }: { onDone?: () => void }) {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Which step to show — driven by USER actions, NOT Privy's transient state.
+  // A wrong code flips Privy's state to "error"; we must stay on the code step
+  // and just show the error, never bounce back to the email form.
+  const [codeSent, setCodeSent] = useState(false);
 
   const sending = emailState === "sending-code";
   const submitting = emailState === "submitting-code";
-  const codeSent = emailState === "awaiting-code" || emailState === "submitting-code";
 
   const submitEmail = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     try {
       await sendCode(email.trim());
+      setCodeSent(true); // advance to the code step and stay there
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't send the code. Try again.");
     }
@@ -36,7 +40,20 @@ export function LoginScreen({ onDone }: { onDone?: () => void }) {
       await confirmCode(code.trim());
       onDone?.();
     } catch {
-      setError("That code didn't work - check it or request a new one.");
+      // wrong/expired code — stay on the code step, show the error, keep
+      // "Resend code" available. Do NOT send a new code automatically.
+      setError("That code isn't valid. Check it and try again, or resend a new one.");
+      setCode("");
+    }
+  };
+
+  const resend = async () => {
+    setError(null);
+    setCode("");
+    try {
+      await sendCode(email.trim());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't resend the code. Try again.");
     }
   };
 
@@ -93,13 +110,27 @@ export function LoginScreen({ onDone }: { onDone?: () => void }) {
             >
               {submitting ? "Verifying…" : "Confirm & enter"}
             </button>
-            <button
-              type="button"
-              onClick={() => void sendCode(email)}
-              className="w-full font-mono text-[11px] uppercase tracking-widest text-mut hover:text-paper"
-            >
-              Resend code
-            </button>
+            <div className="flex items-center justify-between font-mono text-[11px] uppercase tracking-widest text-mut">
+              <button
+                type="button"
+                onClick={() => void resend()}
+                disabled={sending}
+                className="hover:text-paper disabled:opacity-50"
+              >
+                {sending ? "Sending…" : "Resend code"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCodeSent(false);
+                  setError(null);
+                  setCode("");
+                }}
+                className="hover:text-paper"
+              >
+                Change email
+              </button>
+            </div>
           </form>
         )}
 
