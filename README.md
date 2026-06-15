@@ -130,6 +130,15 @@ ships **no** auth/chain JS.
 > All list/detail reads are **bounded** — there is no unbounded view, so views
 > never revert as the ledger grows.
 
+### Live deployment
+
+| Network | Contract address | Explorer |
+| --- | --- | --- |
+| **GenLayer Studio** | `0xb9b501D7c617Cd26d93B61BA996fc67a6002379c` | [view contract ↗](https://explorer-studio.genlayer.com/address/0xb9b501D7c617Cd26d93B61BA996fc67a6002379c) |
+
+The frontend reads this from `NEXT_PUBLIC_GRUDGE_CONTRACT_ADDRESS`; redeploys
+update `apps/web/.env.local` and `contracts/deployments.json`.
+
 ## Deploy to GenLayer
 
 The default real-network target is hosted **GenLayer Studio** (feeless).
@@ -176,9 +185,16 @@ curl -X POST https://studio.genlayer.com/api -H "Content-Type: application/json"
 pnpm typecheck && pnpm lint && pnpm test     # web: TS strict, ESLint, vitest, wallet-lib guard
 pnpm guard:wallet                             # fail if wagmi/rainbowkit/window.ethereum return
 pnpm e2e                                      # Playwright core-loop (mock mode)
-make -C contracts lint                        # ruff --select ALL, mypy --strict, genvm_lint.py
-make -C contracts test                        # settle-math units + gltest --network studionet
+make -C contracts lint                        # ruff --select ALL, mypy --strict, genvm-lint check+typecheck
+make -C contracts test                        # Direct Mode tests (real contract, in-memory) + settle-math
+make -C contracts test-chain                  # Studio-mode integration suite (needs a GenLayer simulator)
 ```
+
+Contract tests use GenLayer's **Direct Mode** ([docs](https://docs.genlayer.com/api-references/genlayer-test)):
+`make test` deploys and runs the REAL `grudge.py` in-memory with the LLM mocked
+(`direct_vm.mock_llm`) and the clock controllable (`warp`) — no Docker, no
+network, milliseconds. The Studio-mode suite (`test-chain`, `tests/test_grudge.py`)
+runs the same flows over real multi-validator consensus against a simulator.
 
 `contracts/scripts/genvm_lint.py` enforces GenVM rules via AST: a `Depends`
 header, exactly one `gl.Contract`, storable state, public decorators, no state

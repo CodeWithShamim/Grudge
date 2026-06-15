@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { explorerAddressUrl, grudgeContractAddress } from "@/lib/chain/bradbury";
 import { CodeBlock } from "./CodeBlock";
 
 /**
@@ -55,6 +56,28 @@ function Section({ id, title, children }: { id: string; title: string; children:
 
 function Lead({ children }: { children: React.ReactNode }) {
   return <p className="text-mut">{children}</p>;
+}
+
+/** Deployed-contract address + explorer link (hidden in mock mode). */
+function ContractAddressCard() {
+  const address = grudgeContractAddress();
+  if (!address) return null;
+  return (
+    <a
+      href={explorerAddressUrl(address)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card border border-ink-line bg-ink-soft px-4 py-3 font-mono text-xs transition-colors hover:border-gold/50"
+      title={`View ${address} on the GenLayer explorer`}
+    >
+      <span className="flex items-center gap-2 uppercase tracking-widest text-mut">
+        <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+        Deployed contract
+      </span>
+      <span className="text-paper">{address}</span>
+      <span className="text-gold">on GenLayer Explorer ↗</span>
+    </a>
+  );
 }
 
 function Term({ children }: { children: React.ReactNode }) {
@@ -247,6 +270,7 @@ result = gl.eq_principle_prompt_comparative(
               Every chain access in the app goes through one adapter; the public methods below are the
               full surface of <Term>contracts/grudge.py</Term>.
             </Lead>
+            <ContractAddressCard />
             <div className="overflow-x-auto rounded-card border border-ink-line">
               <table className="w-full border-collapse text-left text-sm">
                 <thead>

@@ -3,9 +3,12 @@
 
 networks:
   default: studionet
-  # localnet/studionet work out of the box; Bradbury is defined explicitly so
-  # `gltest --network testnet_bradbury` works for pre-release verification.
-  # NOTE: Bradbury history resets periodically — verification target, not CI.
+  # studionet is a preconfigured network, but genlayer-test requires the
+  # default network to be listed here explicitly. An empty map ({}) keeps its
+  # preconfigured URL/settings.
+  studionet: {}
+  # Bradbury is defined explicitly so `gltest --network testnet_bradbury` works
+  # for pre-release verification. NOTE: Bradbury history resets periodically.
   testnet_bradbury:
     url: "https://rpc-bradbury.genlayer.com"
     leader_only: false

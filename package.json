@@ -12,6 +12,8 @@
     "test": "pnpm --filter @grudge/web test",
     "e2e": "pnpm --filter @grudge/web e2e",
     "contracts:lint": "make -C contracts lint",
+    "contracts:check": "make -C contracts check",
+    "contracts:typecheck": "make -C contracts typecheck",
     "contracts:test": "make -C contracts test",
     "prepare": "husky || true"
   },
