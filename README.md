@@ -14,6 +14,8 @@ Every doubt recorded · every receipt public · refereed by GenLayer validator c
 
 </div>
 
+Live link: [grudge.market](https://www.grudges.site/)
+
 ---
 
 ## What is GRUDGE?
