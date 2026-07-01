@@ -18,7 +18,7 @@ Every doubt recorded · every receipt public · refereed by GenLayer validator c
 
 ## What is GRUDGE?
 
-GRUDGE turns a personal commitment into a public, on-chain market. Live link: [grudge.market](https://www.grudges.site/)
+GRUDGE turns a personal commitment into a public, on-chain market. Live link: [grudge.market](https://grudges.site)
 
 1. **You stake** GEN on a concrete, time-boxed claim — _"I will run 5km every day for 30 days."_
 2. **Others take a side.** Believers stake that you'll do it; doubters stake (with public taunts) that you won't. The pools — and the odds — move in real time.
