@@ -658,6 +658,25 @@ def test_verify_anchor_fails_without_code(contract, direct_vm, direct_alice):
         contract.verify_anchor(cid)
 
 
+def test_verify_anchor_finds_code_in_head_meta(contract, direct_vm, direct_alice):
+    # Regression: login-walled profiles (Strava/X/IG) show anonymous fetchers a
+    # log-in body but echo the owner's name — with the ownership code — into the
+    # <head> meta tags. verify_anchor must read the raw SOURCE (web.get), where
+    # the code lives, not inner_text("body"), which strips <head>.
+    cid = create(contract, direct_vm, direct_alice, anchor=ANCHOR)
+    code = _anchor_code(contract, cid)
+    login_wall = (
+        "<html><head>"
+        f'<meta property="og:title" content="Sham Islam {code} | Strava Athlete Profile"/>'
+        f'<meta name="description" content="Sham Islam {code} is an athlete using Strava."/>'
+        "</head><body>Log in to see this athlete. Sign Up. Log In.</body></html>"
+    )
+    direct_vm.mock_web(r"strava\.com", {"method": "GET", "status": 200, "body": login_wall})
+    direct_vm.sender = direct_alice
+    contract.verify_anchor(cid)
+    assert challenge(contract, cid)["anchor_verified"] is True
+
+
 def test_verify_anchor_only_creator(contract, direct_vm, direct_alice, direct_bob):
     cid = create(contract, direct_vm, direct_alice, anchor=ANCHOR)
     direct_vm.sender = direct_bob

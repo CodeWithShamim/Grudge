@@ -847,10 +847,20 @@ class Grudge(gl.Contract):
     @gl.public.write
     def verify_anchor(self, challenge_id: int) -> str:
         """F5: prove the creator OWNS the registered proof source. The validator
-        set fetches the anchor page and checks the challenge's ownership code
-        appears on it — a classic web2 ownership proof, but the check is a
-        consensus artifact. Deterministic string containment on the fetched
-        page, so strict_eq (not an LLM round) is the right principle."""
+        set fetches the anchor page's RAW HTML SOURCE and checks the challenge's
+        ownership code appears in it — a classic web2 ownership proof, but the
+        check is a consensus artifact. Deterministic string containment on the
+        fetched source, so strict_eq (not an LLM round) is the right principle.
+
+        Source, NOT rendered text: web.render returns inner_text("body") — the
+        visible <body> only, stripping the <head>. Login-walled social profiles
+        (Strava, X, Instagram) show anonymous fetchers a "log in to continue"
+        body but echo the owner's name/bio — where the code is placed — into the
+        <head> meta tags (og:title / og:description). Those live in the source
+        but never in inner_text, so a text render never sees the code and
+        verification always fails. web.get returns the raw response body (the
+        source), which carries the meta tags AND any code in the visible text.
+        """
         c = self._get(challenge_id)
         if gl.message.sender_address != c.creator:
             raise gl.vm.UserError("only the challenger verifies their anchor")
@@ -867,11 +877,18 @@ class Grudge(gl.Contract):
 
         def check_page() -> str:
             try:
-                page = gl.nondet.web.render(anchor, mode="text")
-                text = str(page).lower() if page else ""
+                resp = gl.nondet.web.get(anchor)
+                raw = resp.body if resp is not None else b""
+                source = (
+                    raw.decode("utf-8", "ignore") if isinstance(raw, bytes) else str(raw or "")
+                ).lower()
+                if not source:
+                    # web.get unavailable/empty on this runner — fall back to the
+                    # rendered DOM serialized as HTML, which also carries <head>.
+                    source = str(gl.nondet.web.render(anchor, mode="html") or "").lower()
             except Exception:  # noqa: BLE001 — an unreachable page is a clean failure, not a crash
                 return "FETCH_FAILED"
-            return "FOUND" if code in text else "NOT_FOUND"
+            return "FOUND" if code in source else "NOT_FOUND"
 
         outcome = gl.eq_principle.strict_eq(check_page)
         if outcome == "FETCH_FAILED":
