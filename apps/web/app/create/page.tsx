@@ -79,7 +79,7 @@ export default function CreatePage() {
     );
   };
 
-  const anchorValid = proofAnchor.trim() === "" || /^https?:\/\/\S+$/.test(proofAnchor.trim());
+  const anchorValid = /^https?:\/\/\S+$/.test(proofAnchor.trim());
 
   const variants = prefersReduced
     ? { enter: { opacity: 0 }, center: { opacity: 1 }, exit: { opacity: 0 } }
@@ -192,7 +192,7 @@ export default function CreatePage() {
             </div>
             <div>
               <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-mut" htmlFor="proofAnchor">
-                Proof source URL (optional) - anchor evidence to an account you own
+                Proof source URL (required) - anchor evidence to an account you own
               </label>
               <input
                 id="proofAnchor"
@@ -204,8 +204,8 @@ export default function CreatePage() {
                 className="w-full rounded-control border border-ink-line bg-ink-soft px-4 py-3 font-mono text-sm text-paper placeholder:text-mut/50 focus:border-gold focus:outline-none"
               />
               <p className="mt-2 text-xs text-mut">
-                Anchored grudges only accept evidence links from this account. You&apos;ll prove
-                ownership by pasting a code into the profile — the validators fetch the page and
+                Every grudge is anchored: evidence only counts if it links to this account. You&apos;ll
+                prove ownership by pasting a code into the profile — the validators fetch the page and
                 check it by consensus.
               </p>
             </div>

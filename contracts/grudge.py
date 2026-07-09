@@ -12,8 +12,8 @@ consensus. gl.eq_principle.prompt_comparative makes the verdict a consensus
 artifact, not a single oracle's opinion.
 
 F5 (Anchored Proof) moves the proof boundary from "judged text" to "verified
-source": a challenge can register a proof-source URL, ownership is proven by
-the validator set fetching the page and finding a challenge-bound code
+source": every challenge MUST register a proof-source URL, ownership is proven
+by the validator set fetching the page and finding a challenge-bound code
 (strict_eq consensus), evidence links are then deterministically gated to
 that host, and the judge is pinned to the current proof period's time window.
 
@@ -576,11 +576,15 @@ class Grudge(gl.Contract):
             raise gl.vm.UserError("evidence_policy must be 4-280 chars")
         if len(category) > 32:
             raise gl.vm.UserError("category must be <= 32 chars")
-        # F5: an EMPTY anchor means an unanchored (casual) challenge. A non-empty
-        # anchor must be one clean http(s) URL; ownership is proven later via
-        # verify_anchor before any evidence is accepted.
+        # F5: a proof source is REQUIRED — every challenge must anchor its
+        # evidence to an account the creator proves they own (via verify_anchor,
+        # before any evidence is accepted). It must be one clean http(s) URL.
         proof_anchor = proof_anchor.strip()
-        if proof_anchor and (
+        if not proof_anchor:
+            raise gl.vm.UserError(
+                "proof source required: register the account your evidence will link to"
+            )
+        if (
             len(proof_anchor) > ANCHOR_URL_MAX
             or URL_RE.fullmatch(proof_anchor) is None
             or not _url_host(proof_anchor)
@@ -625,7 +629,7 @@ class Grudge(gl.Contract):
             "ACTIVE",
             [],  # evidence
             u64(0),  # last_evidence_at
-            proof_anchor,  # F5: "" = unanchored
+            proof_anchor,  # F5: required; ownership proven via verify_anchor
             False,  # noqa: FBT003 — anchor_verified (positional dataclass init)
         )
         self.challenges[challenge_id] = challenge
