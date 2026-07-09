@@ -14,6 +14,30 @@ Every doubt recorded · every receipt public · refereed by GenLayer validator c
 
 </div>
 
+### Live deployment
+
+| Network                       | Contract address                             | Version                        | Explorer                                                                                                   |
+| ----------------------------- | -------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| **GenLayer Studio** (current) | `0x503Cd4D2f88520c1f8a6455cC958199508789817` | v6 · schema 4 (Anchored Proof) | [view contract ↗](https://explorer-studio.genlayer.com/address/0x503Cd4D2f88520c1f8a6455cC958199508789817) |
+
+The frontend reads this from `NEXT_PUBLIC_GRUDGE_CONTRACT_ADDRESS`; redeploys
+update `apps/web/.env.local` and `contracts/deployments.json`.
+
+**Previous deployments** — kept live so the team can re-test earlier
+transactions at any time (swap `NEXT_PUBLIC_GRUDGE_CONTRACT_ADDRESS`, or open
+the tx directly in the explorer):
+
+| Network          | Contract address                             | Version                             | Explorer                                                                                                     |
+| ---------------- | -------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| GenLayer Studio  | `0xb9b501D7c617Cd26d93B61BA996fc67a6002379c` | v5 · schema 3 (appeals, reputation) | [view contract ↗](https://explorer-studio.genlayer.com/address/0xb9b501D7c617Cd26d93B61BA996fc67a6002379c)   |
+| Testnet Bradbury | `0x652789D1d64026026e4504D99C6B00AC269680C6` | pre-v5                              | [view contract ↗](https://explorer-bradbury.genlayer.com/address/0x652789D1d64026026e4504D99C6B00AC269680C6) |
+| Testnet Bradbury | `0xaba1Db7bfe6Ce35492497E7079ca91e6604e819C` | pre-v5                              | [view contract ↗](https://explorer-bradbury.genlayer.com/address/0xaba1Db7bfe6Ce35492497E7079ca91e6604e819C) |
+
+The full record (dates, schema versions, notes) lives in
+[`contracts/deployments.json`](contracts/deployments.json). Note: storage
+layouts differ across schema versions — old contracts serve their own history,
+but the current frontend build targets schema 4.
+
 ---
 
 ## What is GRUDGE?
@@ -114,51 +138,27 @@ ships **no** auth/chain JS.
 
 ### Contract surface (`contracts/grudge.py`)
 
-| Method | Kind | Purpose |
-| --- | --- | --- |
-| `create_challenge(statement, evidence_policy, category, duration_days, required_proofs)` | `write.payable` | Open a grudge; the GEN sent is your self-stake. A blank `evidence_policy` is AI-designed. |
-| `stake(challenge_id, side, taunt)` | `write.payable` | Back (`believe`) or bet against (`doubt`) with an optional public taunt. |
-| `submit_evidence(challenge_id, evidence_text)` | `write` | Submit a proof; validators reach consensus on the verdict. |
-| `dispute_evidence(challenge_id, index, counter_evidence)` | `write` | Challenge a `VERIFIED` entry; consensus re-judges. |
-| `appeal_verdict(challenge_id, evidence_index)` | `write.payable` | Appeal a `REJECTED` proof with a bond; consensus re-judges (bond returned on flip, else forfeited). |
-| `settle(challenge_id)` | `write` | After the deadline, resolve and credit winners' ledgers. |
-| `claim()` | `write` | Withdraw your settled winnings. |
-| `get_challenge` · `get_challenge_summary` | `view` | Full / bounded single-challenge reads. |
-| `get_challenges_page(offset, limit)` | `view` | Paginated **summaries** (no nested arrays) — the only list read. |
-| `get_stakes_page` · `get_evidence_page` | `view` | Paginate a single challenge's stakes / evidence. |
-| `get_claimable(address)` · `get_solvency()` | `view` | Withdrawable balance · contract liability invariant. |
-| `get_reputation(address)` | `view` | On-chain conviction rating: kept/broken counters + deterministic 0–100 scores. |
-| `explain_verdict(challenge_id, evidence_index)` | `view` | The referee's reasoning for an existing verdict (consensus, never re-judges). |
-| `suggest_evidence_policy(statement)` | `view` | Preview an AI-designed evidence policy for a statement. |
+| Method                                                                                   | Kind            | Purpose                                                                                             |
+| ---------------------------------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------- |
+| `create_challenge(statement, evidence_policy, category, duration_days, required_proofs)` | `write.payable` | Open a grudge; the GEN sent is your self-stake. A blank `evidence_policy` is AI-designed.           |
+| `stake(challenge_id, side, taunt)`                                                       | `write.payable` | Back (`believe`) or bet against (`doubt`) with an optional public taunt.                            |
+| `submit_evidence(challenge_id, evidence_text)`                                           | `write`         | Submit a proof; validators reach consensus on the verdict.                                          |
+| `dispute_evidence(challenge_id, index, counter_evidence)`                                | `write`         | Challenge a `VERIFIED` entry; consensus re-judges.                                                  |
+| `appeal_verdict(challenge_id, evidence_index)`                                           | `write.payable` | Appeal a `REJECTED` proof with a bond; consensus re-judges (bond returned on flip, else forfeited). |
+| `settle(challenge_id)`                                                                   | `write`         | After the deadline, resolve and credit winners' ledgers.                                            |
+| `claim()`                                                                                | `write`         | Withdraw your settled winnings.                                                                     |
+| `get_challenge` · `get_challenge_summary`                                                | `view`          | Full / bounded single-challenge reads.                                                              |
+| `get_challenges_page(offset, limit)`                                                     | `view`          | Paginated **summaries** (no nested arrays) — the only list read.                                    |
+| `get_stakes_page` · `get_evidence_page`                                                  | `view`          | Paginate a single challenge's stakes / evidence.                                                    |
+| `get_claimable(address)` · `get_solvency()`                                              | `view`          | Withdrawable balance · contract liability invariant.                                                |
+| `get_reputation(address)`                                                                | `view`          | On-chain conviction rating: kept/broken counters + deterministic 0–100 scores.                      |
+| `explain_verdict(challenge_id, evidence_index)`                                          | `view`          | The referee's reasoning for an existing verdict (consensus, never re-judges).                       |
+| `suggest_evidence_policy(statement)`                                                     | `view`          | Preview an AI-designed evidence policy for a statement.                                             |
 
 > All list/detail reads are **bounded** — there is no unbounded view, so views
 > never revert as the ledger grows. Views marked above as running consensus
 > (`explain_verdict`, `suggest_evidence_policy`) invoke the validator-LLM panel
 > but never touch storage. See [CHANGELOG.md](CHANGELOG.md) for ABI deltas.
-
-### Live deployment
-
-| Network | Contract address | Version | Explorer |
-| --- | --- | --- | --- |
-| **GenLayer Studio** (current) | `0x503Cd4D2f88520c1f8a6455cC958199508789817` | v6 · schema 4 (Anchored Proof) | [view contract ↗](https://explorer-studio.genlayer.com/address/0x503Cd4D2f88520c1f8a6455cC958199508789817) |
-
-The frontend reads this from `NEXT_PUBLIC_GRUDGE_CONTRACT_ADDRESS`; redeploys
-update `apps/web/.env.local` and `contracts/deployments.json`.
-
-**Previous deployments** — kept live so the team can re-test earlier
-transactions at any time (swap `NEXT_PUBLIC_GRUDGE_CONTRACT_ADDRESS`, or open
-the tx directly in the explorer):
-
-| Network | Contract address | Version | Explorer |
-| --- | --- | --- | --- |
-| GenLayer Studio | `0xb9b501D7c617Cd26d93B61BA996fc67a6002379c` | v5 · schema 3 (appeals, reputation) | [view contract ↗](https://explorer-studio.genlayer.com/address/0xb9b501D7c617Cd26d93B61BA996fc67a6002379c) |
-| Testnet Bradbury | `0x652789D1d64026026e4504D99C6B00AC269680C6` | pre-v5 | [view contract ↗](https://explorer-bradbury.genlayer.com/address/0x652789D1d64026026e4504D99C6B00AC269680C6) |
-| Testnet Bradbury | `0xaba1Db7bfe6Ce35492497E7079ca91e6604e819C` | pre-v5 | [view contract ↗](https://explorer-bradbury.genlayer.com/address/0xaba1Db7bfe6Ce35492497E7079ca91e6604e819C) |
-
-The full record (dates, schema versions, notes) lives in
-[`contracts/deployments.json`](contracts/deployments.json). Note: storage
-layouts differ across schema versions — old contracts serve their own history,
-but the current frontend build targets schema 4.
 
 ### Seed data
 
