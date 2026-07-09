@@ -11,13 +11,19 @@ LLM judgment ("did this evidence prove the promise?") that still needs
 consensus. gl.eq_principle.prompt_comparative makes the verdict a consensus
 artifact, not a single oracle's opinion.
 
+F5 (Anchored Proof) moves the proof boundary from "judged text" to "verified
+source": a challenge can register a proof-source URL, ownership is proven by
+the validator set fetching the page and finding a challenge-bound code
+(strict_eq consensus), evidence links are then deterministically gated to
+that host, and the judge is pinned to the current proof period's time window.
+
 """
 
 import json
 import re
 import typing
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from genlayer import *
 
@@ -42,6 +48,26 @@ JUDGE_RULES = (
     "Respond with ONLY this JSON, nothing else:\n"
     '{{"verdict": "VERIFIED" | "SUSPICIOUS" | "REJECTED", '
     '"reason": "<short reason>", "confidence": <0-100>}}'
+)
+
+# F5: appended to JUDGE_RULES when the submission is judged for a specific
+# proof period — turns "plausibly recent" into "timestamped inside THIS window".
+WINDOW_RULES = (
+    "\n\nTIME WINDOW: this proof period runs {start} to {end}. VERIFIED requires\n"
+    "the evidence to show the action happened INSIDE this window — content whose\n"
+    "own timestamps fall outside it (or that carries no timestamp) is at best\n"
+    "SUSPICIOUS."
+)
+
+# F5: appended when the challenge has a VERIFIED proof anchor. The verdict must
+# rest on what the fetched page shows, not on the challenger's typed claims.
+ANCHOR_RULES = (
+    "\n\nANCHORED PROOF: the challenger pre-registered {host} as their verified\n"
+    "proof source (ownership was checked on-chain). The <untrusted\n"
+    'name="linked_page"> block below was fetched from that source by the\n'
+    "validators. Judge on what the FETCHED PAGE shows — the challenger's typed\n"
+    "text is only a claim. If the page itself does not corroborate the promised\n"
+    "action, the verdict is at best SUSPICIOUS."
 )
 
 SCREEN_RULES = (
@@ -113,7 +139,8 @@ PAGE_LIMIT_MAX = 50  # max challenges per get_challenges_page
 #   v1: original hardened contract
 #   v2: + Reputation map (Feature 4)
 #   v3: + Evidence.appealed / Evidence.appeal_bond (Feature 1, Appeals)
-SCHEMA_VERSION = 3
+#   v4: + Challenge.proof_anchor / Challenge.anchor_verified (Feature 5, Anchored Proof)
+SCHEMA_VERSION = 4
 
 # F4 conviction formula: a "volume dampener" so a tiny sample (1/1) can't score
 # a perfect 100 — it takes a track record to earn a high rating.
@@ -124,6 +151,31 @@ CONVICTION_DAMPENER = 3
 # in total_locked like any stake.
 MIN_APPEAL_BOND = 10**17  # 0.1 GEN
 URL_RE = re.compile(r"https?://[^\s\"'<>]+")
+
+# F5 anchored proof: max length of a registered proof-source URL, and the host
+# part of an http(s) URL (credentials/port stripped by _url_host).
+ANCHOR_URL_MAX = 200
+_HOST_RE = re.compile(r"^https?://([^/?#]+)", re.IGNORECASE)
+
+
+def _url_host(url: str) -> str:
+    """The lowercased host of an http(s) URL, sans credentials/port/leading www.
+
+    Hand-rolled (no urllib) so the check stays a tiny deterministic regex —
+    it gates evidence links against the registered anchor host."""
+    match = _HOST_RE.match(url)
+    if match is None:
+        return ""
+    host = match.group(1)
+    if "@" in host:
+        host = host.rsplit("@", 1)[1]
+    host = host.split(":", 1)[0].lower()
+    return host.removeprefix("www.")
+
+
+def _iso_utc(ts: int) -> str:
+    """A pinned unix timestamp as a human-readable UTC string for prompts."""
+    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 
 def _parse_llm_json(text: str) -> dict[str, typing.Any]:
@@ -214,6 +266,10 @@ class Challenge:
     status: str  # ACTIVE | SUCCEEDED | FAILED | SETTLED
     evidence: DynArray[Evidence]
     last_evidence_at: u64
+    # F5 anchored proof: the creator's registered proof-source URL ("" = none)
+    # and whether ownership was verified on-chain (code found on the page).
+    proof_anchor: str
+    anchor_verified: bool
 
 
 @gl.evm.contract_interface
@@ -295,6 +351,7 @@ class Grudge(gl.Contract):
             "required_proofs": int(c.required_proofs),
             "verified_count": int(c.verified_count),
             "status": c.status,
+            "anchor_verified": c.anchor_verified,
         }
 
     def _challenge_dict(self, challenge_id: int, c: Challenge) -> dict[str, typing.Any]:
@@ -333,6 +390,8 @@ class Grudge(gl.Contract):
             "required_proofs": int(c.required_proofs),
             "verified_count": int(c.verified_count),
             "status": c.status,
+            "proof_anchor": c.proof_anchor,
+            "anchor_verified": c.anchor_verified,
             "evidence_count": len(evidence),
             "evidence_truncated": evidence_truncated,
             "evidence": [
@@ -353,14 +412,22 @@ class Grudge(gl.Contract):
     # ── LLM consensus (non-deterministic blocks) ─────────────────────────
 
     def _judge_evidence(
-        self, statement: str, policy: str, evidence_text: str
+        self,
+        statement: str,
+        policy: str,
+        evidence_text: str,
+        *,
+        window_start: str = "",
+        window_end: str = "",
+        anchor_host: str = "",
     ) -> dict[str, typing.Any]:
-        base_prompt = (
-            JUDGE_RULES.format(statement=statement, policy=policy)
-            + '\n\n<untrusted name="evidence">\n'
-            + evidence_text
-            + "\n</untrusted>"
-        )
+        base_prompt = JUDGE_RULES.format(statement=statement, policy=policy)
+        # F5: pin the judgment to this proof period / the verified proof source.
+        if window_start:
+            base_prompt += WINDOW_RULES.format(start=window_start, end=window_end)
+        if anchor_host:
+            base_prompt += ANCHOR_RULES.format(host=anchor_host)
+        base_prompt += '\n\n<untrusted name="evidence">\n' + evidence_text + "\n</untrusted>"
         url_match = URL_RE.search(evidence_text)
         url = url_match.group(0) if url_match else ""
 
@@ -373,8 +440,22 @@ class Grudge(gl.Contract):
                 # web-fetch API proven on the live Bradbury runner.
                 try:
                     page = gl.nondet.web.render(url, mode="text")
-                    page_text = str(page)[:2000] if page else "<empty page>"
+                    page_text = str(page)[:2000] if page else ""
                 except Exception:  # noqa: BLE001 — a dead link must not crash the judgment
+                    page_text = ""
+                if not page_text:
+                    if anchor_host:
+                        # F5: an anchored proof lives or dies by its source page —
+                        # an unfetchable link is a deterministic rejection, not a
+                        # judgment call.
+                        return json.dumps(
+                            {
+                                "verdict": "REJECTED",
+                                "reason": "anchored proof link could not be fetched",
+                                "confidence": 100,
+                            },
+                            sort_keys=True,
+                        )
                     page_text = "<could not be fetched>"
                 prompt += '\n\n<untrusted name="linked_page">\n' + page_text + "\n</untrusted>"
             result = gl.nondet.exec_prompt(prompt)
@@ -478,6 +559,7 @@ class Grudge(gl.Contract):
         category: str,
         duration_days: int,
         required_proofs: int,
+        proof_anchor: str,
     ) -> str:
         if int(gl.message.value) == 0:
             raise gl.vm.UserError("self-stake required: send GEN with the call")
@@ -494,6 +576,16 @@ class Grudge(gl.Contract):
             raise gl.vm.UserError("evidence_policy must be 4-280 chars")
         if len(category) > 32:
             raise gl.vm.UserError("category must be <= 32 chars")
+        # F5: an EMPTY anchor means an unanchored (casual) challenge. A non-empty
+        # anchor must be one clean http(s) URL; ownership is proven later via
+        # verify_anchor before any evidence is accepted.
+        proof_anchor = proof_anchor.strip()
+        if proof_anchor and (
+            len(proof_anchor) > ANCHOR_URL_MAX
+            or URL_RE.fullmatch(proof_anchor) is None
+            or not _url_host(proof_anchor)
+        ):
+            raise gl.vm.UserError("proof_anchor must be a single http(s) URL <= 200 chars")
 
         # all cheap deterministic guards above run BEFORE the LLM screening,
         # so invalid calls never pay for a consensus round
@@ -533,6 +625,8 @@ class Grudge(gl.Contract):
             "ACTIVE",
             [],  # evidence
             u64(0),  # last_evidence_at
+            proof_anchor,  # F5: "" = unanchored
+            False,  # noqa: FBT003 — anchor_verified (positional dataclass init)
         )
         self.challenges[challenge_id] = challenge
         # C2: the self-stake is now held by the contract
@@ -595,7 +689,35 @@ class Grudge(gl.Contract):
         if int(c.last_evidence_at) != 0 and now - int(c.last_evidence_at) < period:
             raise gl.vm.UserError("evidence already submitted for this proof period")
 
-        verdict = self._judge_evidence(c.statement, c.evidence_policy, evidence_text)
+        # F5 anchored proof: all deterministic, all BEFORE the consensus round.
+        # An anchored challenge only accepts evidence that links to the verified
+        # proof source — identity and account ownership are enforced here, not
+        # judged by the LLM.
+        anchor_host = ""
+        if c.proof_anchor:
+            if not c.anchor_verified:
+                raise gl.vm.UserError("verify your proof anchor before submitting evidence")
+            anchor_host = _url_host(c.proof_anchor)
+            urls = URL_RE.findall(evidence_text)
+            if not urls:
+                raise gl.vm.UserError("anchored challenge: evidence must link to your proof source")
+            for link in urls:
+                if _url_host(link) != anchor_host:
+                    raise gl.vm.UserError(
+                        "evidence links must be on your proof source: " + anchor_host
+                    )
+
+        # F5: the judge sees THIS proof period's window, so "recent-sounding"
+        # content can't pass for action inside the period.
+        window_start = max(int(c.starts_at), int(c.last_evidence_at))
+        verdict = self._judge_evidence(
+            c.statement,
+            c.evidence_policy,
+            evidence_text,
+            window_start=_iso_utc(window_start),
+            window_end=_iso_utc(now),
+            anchor_host=anchor_host,
+        )
 
         day = (now - int(c.starts_at)) // DAY_SECONDS + 1
         c.evidence.append(
@@ -713,6 +835,52 @@ class Grudge(gl.Contract):
 
         self._assert_solvent()
         return json.dumps(verdict, sort_keys=True)
+
+    # ── F5: anchored proof ────────────────────────────────────────────────
+
+    def _anchor_code(self, challenge_id: int, creator: Address) -> str:
+        """Deterministic ownership code the creator must place on the anchor
+        page (profile bio / pinned post). Bound to the challenge AND the
+        creator, so a code can't be reused across challenges or wallets."""
+        return "grudge-" + str(challenge_id) + "-" + creator.as_hex.lower()[2:10]
+
+    @gl.public.write
+    def verify_anchor(self, challenge_id: int) -> str:
+        """F5: prove the creator OWNS the registered proof source. The validator
+        set fetches the anchor page and checks the challenge's ownership code
+        appears on it — a classic web2 ownership proof, but the check is a
+        consensus artifact. Deterministic string containment on the fetched
+        page, so strict_eq (not an LLM round) is the right principle."""
+        c = self._get(challenge_id)
+        if gl.message.sender_address != c.creator:
+            raise gl.vm.UserError("only the challenger verifies their anchor")
+        if c.status != "ACTIVE":
+            raise gl.vm.UserError("challenge is closed")
+        if not c.proof_anchor:
+            raise gl.vm.UserError("no proof anchor registered for this challenge")
+        if c.anchor_verified:
+            raise gl.vm.UserError("anchor already verified")
+
+        # snapshot plain strings — nothing storage-bound crosses into the block
+        anchor = c.proof_anchor
+        code = self._anchor_code(challenge_id, c.creator)
+
+        def check_page() -> str:
+            try:
+                page = gl.nondet.web.render(anchor, mode="text")
+                text = str(page).lower() if page else ""
+            except Exception:  # noqa: BLE001 — an unreachable page is a clean failure, not a crash
+                return "FETCH_FAILED"
+            return "FOUND" if code in text else "NOT_FOUND"
+
+        outcome = gl.eq_principle.strict_eq(check_page)
+        if outcome == "FETCH_FAILED":
+            raise gl.vm.UserError("anchor page could not be fetched")
+        if outcome != "FOUND":
+            raise gl.vm.UserError("anchor code not found on the page: add " + code + " and retry")
+
+        c.anchor_verified = True
+        return json.dumps({"anchor": anchor, "code": code, "verified": True}, sort_keys=True)
 
     @gl.public.write
     def settle(self, challenge_id: int) -> str:
@@ -989,6 +1157,20 @@ class Grudge(gl.Contract):
                 "doubts_correct": correct,
                 "conviction_score": _dampened_ratio(won, created),
                 "doubter_accuracy": _dampened_ratio(correct, made),
+            },
+            sort_keys=True,
+        )
+
+    @gl.public.view
+    def get_anchor_code(self, challenge_id: int) -> str:
+        """F5: the ownership code the creator must place on their anchor page
+        before calling verify_anchor. Fixed-size, deterministic, no consensus."""
+        c = self._get(challenge_id)
+        return json.dumps(
+            {
+                "anchor": c.proof_anchor,
+                "code": self._anchor_code(challenge_id, c.creator) if c.proof_anchor else "",
+                "verified": c.anchor_verified,
             },
             sort_keys=True,
         )

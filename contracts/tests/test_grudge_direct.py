@@ -79,11 +79,11 @@ def contract(direct_deploy):
     return direct_deploy("grudge.py")
 
 
-def create(c, vm, creator, *, statement=STATEMENT, days=30, proofs=10, stake=10 * GEN):
+def create(c, vm, creator, *, statement=STATEMENT, days=30, proofs=10, stake=10 * GEN, anchor=""):
     mock_screen_accept(vm)
     vm.sender = creator
     vm.value = stake
-    cid = c.create_challenge(statement, POLICY, "fitness", days, proofs)
+    cid = c.create_challenge(statement, POLICY, "fitness", days, proofs, anchor)
     vm.value = 0
     return int(cid)
 
@@ -109,7 +109,7 @@ def test_create_requires_self_stake(contract, direct_vm, direct_alice):
     direct_vm.sender = direct_alice
     direct_vm.value = 0
     with direct_vm.expect_revert("self-stake required"):
-        contract.create_challenge(STATEMENT, POLICY, "fitness", 30, 10)
+        contract.create_challenge(STATEMENT, POLICY, "fitness", 30, 10, "")
 
 
 def test_create_rejects_bad_duration(contract, direct_vm, direct_alice):
@@ -117,7 +117,7 @@ def test_create_rejects_bad_duration(contract, direct_vm, direct_alice):
     direct_vm.sender = direct_alice
     direct_vm.value = GEN
     with direct_vm.expect_revert("duration must be"):
-        contract.create_challenge(STATEMENT, POLICY, "fitness", 0, 1)
+        contract.create_challenge(STATEMENT, POLICY, "fitness", 0, 1, "")
 
 
 def test_create_rejected_by_screening(contract, direct_vm, direct_alice):
@@ -125,7 +125,7 @@ def test_create_rejected_by_screening(contract, direct_vm, direct_alice):
     direct_vm.sender = direct_alice
     direct_vm.value = GEN
     with direct_vm.expect_revert("statement rejected"):
-        contract.create_challenge("I will be better at things", POLICY, "general", 30, 10)
+        contract.create_challenge("I will be better at things", POLICY, "general", 30, 10, "")
 
 
 # ── stake ────────────────────────────────────────────────────────────────────
@@ -481,7 +481,7 @@ def test_blank_policy_autofilled_on_create(contract, direct_vm, direct_alice):
     )
     direct_vm.sender = direct_alice
     direct_vm.value = 10 * GEN
-    cid = int(contract.create_challenge(STATEMENT, "", "fitness", 30, 10))
+    cid = int(contract.create_challenge(STATEMENT, "", "fitness", 30, 10, ""))
     direct_vm.value = 0
 
     ch = challenge(contract, cid)
@@ -493,7 +493,7 @@ def test_nonblank_short_policy_still_rejected(contract, direct_vm, direct_alice)
     direct_vm.sender = direct_alice
     direct_vm.value = 10 * GEN
     with direct_vm.expect_revert("evidence_policy must be 4-280 chars"):
-        contract.create_challenge(STATEMENT, "no", "fitness", 30, 10)
+        contract.create_challenge(STATEMENT, "no", "fitness", 30, 10, "")
 
 
 # ── F1: appeals ──────────────────────────────────────────────────────────────
@@ -605,6 +605,113 @@ def test_appeal_conservation(contract, direct_vm, direct_alice, direct_bob):
     contract.settle(cid)
     # total_locked is unchanged by settle (funds only move between buckets)
     assert int(json.loads(contract.get_solvency())["total_locked"]) == locked_after
+
+
+# ── F5: anchored proof ───────────────────────────────────────────────────────
+
+ANCHOR = "https://www.strava.com/athletes/4242"
+
+
+def _anchor_code(c, cid) -> str:
+    return json.loads(c.get_anchor_code(cid))["code"]
+
+
+def _verify_anchor(c, vm, cid, creator, *, page_body=None):
+    """Mock the anchor page (containing the ownership code unless overridden)
+    and run verify_anchor as the creator."""
+    body = page_body if page_body is not None else f"Athlete bio — {_anchor_code(c, cid)} — runs."
+    vm.mock_web(r"strava\.com", {"method": "GET", "status": 200, "body": body})
+    vm.sender = creator
+    c.verify_anchor(cid)
+
+
+def test_create_with_anchor_stores_it_unverified(contract, direct_vm, direct_alice):
+    cid = create(contract, direct_vm, direct_alice, anchor=ANCHOR)
+    ch = challenge(contract, cid)
+    assert ch["proof_anchor"] == ANCHOR
+    assert ch["anchor_verified"] is False
+    info = json.loads(contract.get_anchor_code(cid))
+    assert info["code"].startswith(f"grudge-{cid}-")
+    assert info["verified"] is False
+
+
+def test_create_rejects_malformed_anchor(contract, direct_vm, direct_alice):
+    mock_screen_accept(direct_vm)
+    direct_vm.sender = direct_alice
+    direct_vm.value = GEN
+    with direct_vm.expect_revert("proof_anchor must be"):
+        contract.create_challenge(STATEMENT, POLICY, "fitness", 30, 10, "strava.com/athletes/1")
+
+
+def test_verify_anchor_flips_flag(contract, direct_vm, direct_alice):
+    cid = create(contract, direct_vm, direct_alice, anchor=ANCHOR)
+    _verify_anchor(contract, direct_vm, cid, direct_alice)
+    ch = challenge(contract, cid)
+    assert ch["anchor_verified"] is True
+
+
+def test_verify_anchor_fails_without_code(contract, direct_vm, direct_alice):
+    cid = create(contract, direct_vm, direct_alice, anchor=ANCHOR)
+    direct_vm.mock_web(r"strava\.com", {"method": "GET", "status": 200, "body": "just a bio"})
+    direct_vm.sender = direct_alice
+    with direct_vm.expect_revert("anchor code not found"):
+        contract.verify_anchor(cid)
+
+
+def test_verify_anchor_only_creator(contract, direct_vm, direct_alice, direct_bob):
+    cid = create(contract, direct_vm, direct_alice, anchor=ANCHOR)
+    direct_vm.sender = direct_bob
+    with direct_vm.expect_revert("only the challenger"):
+        contract.verify_anchor(cid)
+
+
+def test_anchored_evidence_blocked_until_verified(contract, direct_vm, direct_alice):
+    cid = create(contract, direct_vm, direct_alice, anchor=ANCHOR)
+    direct_vm.sender = direct_alice
+    with direct_vm.expect_revert("verify your proof anchor"):
+        contract.submit_evidence(cid, "Ran 5.2km — https://www.strava.com/activities/9")
+
+
+def test_anchored_evidence_requires_link(contract, direct_vm, direct_alice):
+    cid = create(contract, direct_vm, direct_alice, anchor=ANCHOR)
+    _verify_anchor(contract, direct_vm, cid, direct_alice)
+    direct_vm.sender = direct_alice
+    with direct_vm.expect_revert("evidence must link to your proof source"):
+        contract.submit_evidence(cid, "Ran 5.2km this morning, trust me.")
+
+
+def test_anchored_evidence_rejects_foreign_host(contract, direct_vm, direct_alice):
+    cid = create(contract, direct_vm, direct_alice, anchor=ANCHOR)
+    _verify_anchor(contract, direct_vm, cid, direct_alice)
+    direct_vm.sender = direct_alice
+    with direct_vm.expect_revert("links must be on your proof source"):
+        contract.submit_evidence(cid, "Proof here: https://evil.example.com/fake-run")
+
+
+def test_anchored_evidence_judged_on_fetched_page(contract, direct_vm, direct_alice):
+    cid = create(contract, direct_vm, direct_alice, anchor=ANCHOR)
+    _verify_anchor(contract, direct_vm, cid, direct_alice)
+    # mock_judge clears ALL mocks (web included) — re-mock the activity page
+    # the judge fetches inside the non-deterministic block.
+    mock_judge(direct_vm, "VERIFIED")
+    direct_vm.mock_web(
+        r"strava\.com",
+        {"method": "GET", "status": 200, "body": "Run — 5.2 km — today 07:14"},
+    )
+    direct_vm.sender = direct_alice
+    contract.submit_evidence(cid, "Morning run: https://www.strava.com/activities/9001")
+    ch = challenge(contract, cid)
+    assert ch["verified_count"] == 1
+    assert ch["evidence"][-1]["verdict"] == "VERIFIED"
+
+
+def test_unanchored_flow_unchanged(contract, direct_vm, direct_alice):
+    # no anchor → text-only evidence still judged (legacy/casual mode)
+    cid = create(contract, direct_vm, direct_alice)
+    mock_judge(direct_vm, "VERIFIED")
+    direct_vm.sender = direct_alice
+    contract.submit_evidence(cid, "Ran 5.3km in 30:55, no link today.")
+    assert challenge(contract, cid)["verified_count"] == 1
 
 
 def _addr(account) -> str:

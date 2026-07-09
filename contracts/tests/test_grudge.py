@@ -32,7 +32,7 @@ def contract():
 
 def _create(contract, statement=STATEMENT, duration=30, proofs=24):
     return contract.create_challenge(
-        args=[statement, POLICY, "fitness", duration, proofs],
+        args=[statement, POLICY, "fitness", duration, proofs, ""],
     ).transact(value=SELF_STAKE)
 
 
@@ -69,7 +69,7 @@ def test_create_accepts_concrete_statement(contract):
 
 def test_create_rejects_vague_statement(contract):
     result = contract.create_challenge(
-        args=["I will be better", POLICY, "general", 30, 24],
+        args=["I will be better", POLICY, "general", 30, 24, ""],
     ).transact(value=SELF_STAKE)
     assert tx_execution_failed(result)
 
@@ -263,7 +263,7 @@ def test_time_is_deterministic(contract):
     result = (
         contract.connect(creator)
         .create_challenge(
-            args=["I will stretch every day for 20 days", POLICY, "habits", 20, 10],
+            args=["I will stretch every day for 20 days", POLICY, "habits", 20, 10, ""],
         )
         .transact(value=SELF_STAKE)
     )
@@ -300,7 +300,7 @@ def test_solvency_after_settle(contract):
     result = (
         contract.connect(creator)
         .create_challenge(
-            args=["I will journal every day for 15 days", POLICY, "habits", 15, 7],
+            args=["I will journal every day for 15 days", POLICY, "habits", 15, 7, ""],
         )
         .transact(value=SELF_STAKE)
     )
