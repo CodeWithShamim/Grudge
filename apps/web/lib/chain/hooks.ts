@@ -22,6 +22,7 @@ export const qk = {
   leaderboards: ["leaderboards"] as const,
   claimable: (address: string) => ["claimable", address] as const,
   reputation: (address: string) => ["reputation", address] as const,
+  anchor: (id: string) => ["anchor", id] as const,
 };
 
 /** The acting identity: connected wallet, or the demo identity in mock mode. */
@@ -224,6 +225,31 @@ export function useAppealVerdict(challengeId: string) {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: qk.challenge(challengeId) });
       void qc.invalidateQueries({ queryKey: ["claimable"] });
+    },
+  });
+}
+
+/** F5: the ownership code + status for a challenge's proof anchor. */
+export function useAnchorInfo(challengeId: string, enabled = true) {
+  return useQuery({
+    queryKey: qk.anchor(challengeId),
+    queryFn: async () => (await getGrudgeClient()).getAnchorInfo(challengeId),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+/** F5: consensus-verify the registered proof anchor (creator only). */
+export function useVerifyAnchor(challengeId: string) {
+  const qc = useQueryClient();
+  const { address } = useViewer();
+  return useMutation({
+    mutationFn: async () => (await getGrudgeClient()).verifyAnchor(challengeId, address),
+    onSuccess: ({ txHash }) => txToast("Anchor verified. Your proof source is locked in.", txHash),
+    onError: (e) => errToast("Anchor verification failed", e),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: qk.challenge(challengeId) });
+      void qc.invalidateQueries({ queryKey: qk.anchor(challengeId) });
     },
   });
 }

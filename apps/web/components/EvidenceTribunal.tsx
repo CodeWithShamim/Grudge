@@ -57,10 +57,20 @@ export function EvidenceTribunal({ challenge, className }: { challenge: Challeng
     setCounterText("");
   };
 
+  // F5: an anchored grudge accepts no evidence until ownership is verified —
+  // the ProofAnchor panel in the header carries the verification flow.
+  const anchorBlocked = Boolean(challenge.proofAnchor) && !challenge.anchorVerified;
+
   return (
     <section className={cn("space-y-6", className)} aria-label="Evidence tribunal">
+      {isCreator && challenge.status === "ACTIVE" && anchorBlocked && (
+        <div className="rounded-card border border-gold/40 bg-gold/5 p-4 font-mono text-xs text-gold">
+          Verify your proof anchor (above) before submitting evidence — the validators only accept
+          links from your registered proof source.
+        </div>
+      )}
       {/* submission box — challenger only */}
-      {isCreator && challenge.status === "ACTIVE" && phase.name === "idle" && (
+      {isCreator && challenge.status === "ACTIVE" && !anchorBlocked && phase.name === "idle" && (
         <div className="grain relative rounded-card bg-ink-soft p-5 shadow-e2">
           <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-mut">
             Submit today&apos;s proof · judged by validator consensus · injection attempts are auto-rejected

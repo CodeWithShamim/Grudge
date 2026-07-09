@@ -4,6 +4,7 @@ import {
   JudgeResultSchema,
   MIN_STAKE_GEN,
   ScreeningSchema,
+  type AnchorInfo,
   type Challenge,
   type CreateChallengeInput,
   type EvidenceEntry,
@@ -35,6 +36,17 @@ function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+// F5: mirrors the contract's _url_host — lowercased host, no port, no www.
+const URL_RE = /https?:\/\/[^\s"'<>]+/g;
+function urlHost(url: string): string {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host.startsWith("www.") ? host.slice(4) : host;
+  } catch {
+    return "";
+  }
+}
+
 /** Calls the judge API route (LLM if keyed, heuristic otherwise); falls back locally. */
 async function remoteJudge(
   kind: "evidence" | "screen",
@@ -62,8 +74,12 @@ export function seedChallenges(now: number): Challenge[] {
   type SeedEvidence = Omit<EvidenceEntry, "appealed" | "appealBond"> &
     Partial<Pick<EvidenceEntry, "appealed" | "appealBond">>;
   const mk = (
-    c: Omit<Challenge, "believerPool" | "doubterPool" | "evidence"> & { evidence: SeedEvidence[] },
+    c: Omit<Challenge, "believerPool" | "doubterPool" | "evidence" | "proofAnchor" | "anchorVerified"> & {
+      evidence: SeedEvidence[];
+    } & Partial<Pick<Challenge, "proofAnchor" | "anchorVerified">>,
   ): Challenge => ({
+    proofAnchor: "",
+    anchorVerified: false,
     ...c,
     evidence: c.evidence.map((e) => ({ appealed: false, appealBond: 0, ...e })),
     believerPool: c.stakes.filter((s) => s.side === "believe").reduce((a, s) => a + s.amount, 0),
@@ -77,6 +93,8 @@ export function seedChallenges(now: number): Challenge[] {
       statement: "I will run 5km every day for 30 days",
       evidencePolicy: "Strava screenshot or activity link per day, distance ≥ 5.0km",
       category: "fitness",
+      proofAnchor: "https://www.strava.com/athletes/theself",
+      anchorVerified: true,
       selfStake: 200,
       stakes: [
         { address: "0xSrab0ni00000000000000000000000000000001", side: "doubt", amount: 150, taunt: "You quit the gym in week one. Twice.", at: now - 6 * DAY },
@@ -200,6 +218,8 @@ export function seedChallenges(now: number): Challenge[] {
       statement: "I will solve one LeetCode problem every day for 45 days",
       evidencePolicy: "Public submission link with accepted status, daily",
       category: "career",
+      proofAnchor: "https://leetcode.com/u/grinder",
+      anchorVerified: false,
       selfStake: 250,
       stakes: [
         { address: "0xRecruiter0000000000000000000000000000019", side: "believe", amount: 150, at: now - 1 * DAY },
@@ -368,6 +388,8 @@ export function createMockGrudgeClient(): GrudgeClient {
         verifiedCount: 0,
         status: "ACTIVE",
         evidence: [],
+        proofAnchor: input.proofAnchor,
+        anchorVerified: false,
       });
       return { id, txHash: fakeTxHash() };
     },
@@ -392,6 +414,17 @@ export function createMockGrudgeClient(): GrudgeClient {
       if (c.creator.toLowerCase() !== from.toLowerCase()) throw new Error("Only the challenger submits evidence.");
       if (c.status !== "ACTIVE") throw new Error("This grudge is closed.");
       if (Date.now() >= c.endsAt) throw new Error("Deadline passed - settle the challenge.");
+      // F5: anchored grudges only accept links from the verified proof source
+      // (mirrors the contract's deterministic pre-consensus gate).
+      if (c.proofAnchor) {
+        if (!c.anchorVerified) throw new Error("Verify your proof anchor before submitting evidence.");
+        const host = urlHost(c.proofAnchor);
+        const links = evidenceText.match(URL_RE) ?? [];
+        if (links.length === 0) throw new Error(`Anchored grudge: evidence must link to ${host}.`);
+        for (const link of links) {
+          if (urlHost(link) !== host) throw new Error(`Evidence links must be on your proof source (${host}).`);
+        }
+      }
       // Latency here is intentional: the validator-arc animation plays over it.
       await delay(900);
       const result = (await remoteJudge("evidence", {
@@ -465,6 +498,27 @@ export function createMockGrudgeClient(): GrudgeClient {
         c.doubterPool += bond;
       }
       return { txHash: fakeTxHash(), entry: structuredClone(entry) };
+    },
+
+    async getAnchorInfo(id: string): Promise<AnchorInfo> {
+      await delay(150);
+      const c = must(id);
+      return {
+        anchor: c.proofAnchor,
+        code: c.proofAnchor ? `grudge-${id}-${c.creator.slice(2, 10).toLowerCase()}` : "",
+        verified: c.anchorVerified,
+      };
+    },
+
+    async verifyAnchor(id: string, from: string): Promise<TxResult> {
+      // F5 mock: the "validators" always find the code on the page.
+      const c = must(id);
+      if (c.creator.toLowerCase() !== from.toLowerCase()) throw new Error("Only the challenger verifies their anchor.");
+      if (!c.proofAnchor) throw new Error("No proof anchor registered for this grudge.");
+      if (c.anchorVerified) throw new Error("Anchor already verified.");
+      await delay(900);
+      c.anchorVerified = true;
+      return { txHash: fakeTxHash() };
     },
 
     async settle(id: string): Promise<SettleResult> {

@@ -25,6 +25,24 @@ Verdicts:
 Respond with ONLY this JSON, nothing else:
 {"verdict": "VERIFIED" | "SUSPICIOUS" | "REJECTED", "reason": "<short reason>", "confidence": <0-100>}`;
 
+/** F5: appended when judging for a specific proof period (mirrors WINDOW_RULES). */
+export const WINDOW_SYSTEM_RULES = `
+
+TIME WINDOW: this proof period runs {start} to {end}. VERIFIED requires
+the evidence to show the action happened INSIDE this window — content whose
+own timestamps fall outside it (or that carries no timestamp) is at best
+SUSPICIOUS.`;
+
+/** F5: appended when the challenge has a verified proof anchor (mirrors ANCHOR_RULES). */
+export const ANCHOR_SYSTEM_RULES = `
+
+ANCHORED PROOF: the challenger pre-registered {host} as their verified
+proof source (ownership was checked on-chain). The <untrusted
+name="linked_page"> block below was fetched from that source by the
+validators. Judge on what the FETCHED PAGE shows — the challenger's typed
+text is only a claim. If the page itself does not corroborate the promised
+action, the verdict is at best SUSPICIOUS.`;
+
 export const SCREEN_SYSTEM_RULES = `You screen statements for a public accountability game.
 A valid statement is a concrete, measurable, time-boxed, personally-verifiable
 real-world commitment (e.g. "I will run 5km every day for 30 days").

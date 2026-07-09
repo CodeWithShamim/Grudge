@@ -15,6 +15,7 @@ import { ProofGrid } from "./ProofGrid";
 import { DoubterBench } from "./DoubterBench";
 import { ConvictionBadge } from "./ConvictionBadge";
 import { EvidenceTribunal } from "./EvidenceTribunal";
+import { ProofAnchor } from "./ProofAnchor";
 import { StakePanel } from "./StakePanel";
 import { SettleTakeover } from "./SettleTakeover";
 import { Button } from "./ui/Button";
@@ -81,6 +82,8 @@ export function ChallengeView({ id }: { id: string }) {
         </h1>
         <p className="mb-1 font-mono text-sm text-gold">{oddsLine(challenge)}</p>
         <p className="mb-5 text-xs text-mut">Policy: {challenge.evidencePolicy}</p>
+
+        <ProofAnchor challenge={challenge} />
 
         <TugOfWar believe={challenge.believerPool + challenge.selfStake} doubt={challenge.doubterPool} />
 

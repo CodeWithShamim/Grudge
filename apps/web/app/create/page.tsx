@@ -43,6 +43,7 @@ export default function CreatePage() {
   const [screening, setScreening] = useState<Screening | null>(null);
   const [screeningPending, setScreeningPending] = useState(false);
   const [policy, setPolicy] = useState<string>(DEFAULTS.policy);
+  const [proofAnchor, setProofAnchor] = useState<string>("");
   const [category, setCategory] = useState<string>(DEFAULTS.category);
   const [durationDays, setDurationDays] = useState<number>(DEFAULTS.durationDays);
   const [requiredProofs, setRequiredProofs] = useState<number>(DEFAULTS.requiredProofs);
@@ -65,10 +66,20 @@ export default function CreatePage() {
 
   const submit = () => {
     create.mutate(
-      { statement, evidencePolicy: policy, category, durationDays, requiredProofs, selfStake },
+      {
+        statement,
+        evidencePolicy: policy,
+        category,
+        durationDays,
+        requiredProofs,
+        selfStake,
+        proofAnchor: proofAnchor.trim(),
+      },
       { onSuccess: ({ id }) => router.push(`/challenge/${id}`) },
     );
   };
+
+  const anchorValid = proofAnchor.trim() === "" || /^https?:\/\/\S+$/.test(proofAnchor.trim());
 
   const variants = prefersReduced
     ? { enter: { opacity: 0 }, center: { opacity: 1 }, exit: { opacity: 0 } }
@@ -179,6 +190,25 @@ export default function CreatePage() {
                 </p>
               )}
             </div>
+            <div>
+              <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-mut" htmlFor="proofAnchor">
+                Proof source URL (optional) - anchor evidence to an account you own
+              </label>
+              <input
+                id="proofAnchor"
+                type="url"
+                value={proofAnchor}
+                onChange={(e) => setProofAnchor(e.target.value)}
+                maxLength={200}
+                placeholder="https://www.strava.com/athletes/you"
+                className="w-full rounded-control border border-ink-line bg-ink-soft px-4 py-3 font-mono text-sm text-paper placeholder:text-mut/50 focus:border-gold focus:outline-none"
+              />
+              <p className="mt-2 text-xs text-mut">
+                Anchored grudges only accept evidence links from this account. You&apos;ll prove
+                ownership by pasting a code into the profile — the validators fetch the page and
+                check it by consensus.
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <NumberField label="Duration (days)" value={durationDays} onChange={setDurationDays} min={3} max={365} />
               <NumberField label="Required proofs" value={requiredProofs} onChange={setRequiredProofs} min={1} max={365} />
@@ -205,7 +235,7 @@ export default function CreatePage() {
               <Button variant="ghost" onClick={() => go(0)}>
                 ← Back
               </Button>
-              <Button onClick={() => go(2)} disabled={policy.trim().length < 10}>
+              <Button onClick={() => go(2)} disabled={policy.trim().length < 10 || !anchorValid}>
                 Next: the stake →
               </Button>
             </div>
@@ -227,6 +257,7 @@ export default function CreatePage() {
               <p className="display-statement mt-2 text-display-md text-paper">{statement}</p>
               <p className="mt-2 text-xs text-mut">
                 {policy} · {durationDays} days · {requiredProofs} proofs required · {selfStake} GEN self-stake
+                {proofAnchor.trim() && ` · anchored to ${proofAnchor.trim()}`}
               </p>
             </div>
             <div className="flex gap-2">

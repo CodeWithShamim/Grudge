@@ -6,6 +6,46 @@ storage layout (`SCHEMA_VERSION`).
 
 ---
 
+## v6 — Anchored Proof (2026-07-09)
+
+Moves the proof boundary from "validators judge submitted text" to "validators
+verify an owned, timestamped source" (the gap called out in the submission
+review): identity, account ownership, and the proof period are now enforced
+before/around the LLM judgment instead of being left to it.
+
+> **⚠️ Requires a fresh deploy.** `Challenge` gained two fields
+> (`proof_anchor: str`, `anchor_verified: bool`) and `create_challenge` gained
+> a parameter. `SCHEMA_VERSION` bumped **3 → 4**. After deploying, update
+> `NEXT_PUBLIC_GRUDGE_CONTRACT_ADDRESS`.
+
+### Added — contract methods (ABI deltas)
+
+| Method | Kind | Signature → returns |
+| --- | --- | --- |
+| `verify_anchor` | **write** *(web-fetch consensus)* | `(challenge_id: int) -> str` → `{"anchor","code","verified"}` |
+| `get_anchor_code` | view | `(challenge_id: int) -> str` → `{"anchor","code","verified"}` |
+
+Contract method count: **17 → 19** (views **10 → 11**, writes **7 → 8**).
+
+### Changed — contract
+
+- **`create_challenge(…, proof_anchor: str)`** — new trailing parameter. `""` = unanchored (previous behavior); a non-empty value must be one http(s) URL ≤ 200 chars and registers the challenge's proof source.
+- **`verify_anchor`** — ownership proof: the validator set fetches the anchor page and checks a challenge-bound code (`grudge-<id>-<creator-addr-prefix>`) appears on it, via `gl.eq_principle.strict_eq` (deterministic containment on non-deterministically fetched content — no LLM round).
+- **`submit_evidence`** — deterministic pre-consensus gates on anchored challenges: anchor must be verified, evidence must contain ≥1 link, and every link's host must equal the anchor host. The judge prompt gains a **TIME WINDOW** block (this proof period's pinned start/end) and, when anchored, an **ANCHORED PROOF** block requiring the verdict to rest on the fetched page — an unfetchable anchored link is deterministically REJECTED.
+- **`get_challenge`** — `+ proof_anchor`, `+ anchor_verified`; **`get_challenges_page`** summaries — `+ anchor_verified`.
+
+### Added — web
+
+- `GrudgeClient.getAnchorInfo` / `GrudgeClient.verifyAnchor` (genlayer + mock; the mock mirrors the origin gate).
+- `ProofAnchor` component: anchor badge on the challenge page + the creator's verification flow (shows the code to paste, fires `verify_anchor`).
+- Create wizard: optional "Proof source URL" field; the tribunal blocks evidence submission until an anchored grudge is verified.
+
+Deliberate scope note: the anchor proves *account ownership*, not human truth —
+the defensible claim is "evidence must come from an owned, platform-timestamped
+source," not "cheating is impossible."
+
+---
+
 ## v5 — GenLayer-native features (2026-06-15)
 
 Four high-impact features on top of the hardened contract, built without

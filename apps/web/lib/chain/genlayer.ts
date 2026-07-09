@@ -4,9 +4,11 @@ import { getBradburyEnv } from "./bradbury";
 import { friendlyError } from "./errors";
 import { emitTxStatus } from "./txStatus";
 import {
+  AnchorInfoSchema,
   ChallengeSchema,
   ReputationSchema,
   ScreeningSchema,
+  type AnchorInfo,
   type Challenge,
   type CreateChallengeInput,
   type EvidenceEntry,
@@ -88,6 +90,9 @@ const RawChallengeSchema = z.object({
       appeal_bond: z.string().default("0"),
     }),
   ),
+  // F5 anchored proof (defaults keep pre-v4 deployments parseable)
+  proof_anchor: z.string().default(""),
+  anchor_verified: z.boolean().default(false),
 });
 
 function adaptChallenge(raw: z.infer<typeof RawChallengeSchema>): Challenge {
@@ -116,6 +121,8 @@ function adaptChallenge(raw: z.infer<typeof RawChallengeSchema>): Challenge {
       ...e,
       appealBond: fromUnits(BigInt(e.appeal_bond)),
     })),
+    proofAnchor: raw.proof_anchor,
+    anchorVerified: raw.anchor_verified,
   });
 }
 
@@ -333,6 +340,8 @@ const AI_WRITES = new Set([
   "create_challenge",
   "submit_evidence",
   "dispute_evidence",
+  // F5: no LLM, but a full web-fetch consensus round — same slow path.
+  "verify_anchor",
 ]);
 
 function sleep(ms: number): Promise<void> {
@@ -551,6 +560,7 @@ const SummarySchema = z.object({
   required_proofs: z.number(),
   verified_count: z.number(),
   status: z.enum(["ACTIVE", "SUCCEEDED", "FAILED", "SETTLED"]),
+  anchor_verified: z.boolean().default(false),
 });
 
 const ChallengesPageSchema = z.object({
@@ -582,6 +592,9 @@ function adaptSummary(raw: z.infer<typeof SummarySchema>): Challenge {
     verifiedCount: raw.verified_count,
     status: raw.status,
     evidence: [],
+    // summaries carry the flag only; the full anchor URL comes from get_challenge
+    proofAnchor: "",
+    anchorVerified: raw.anchor_verified,
   });
 }
 
@@ -643,6 +656,7 @@ export function createGenLayerGrudgeClient(): GrudgeClient {
           input.category,
           input.durationDays,
           input.requiredProofs,
+          input.proofAnchor,
         ],
         toUnits(input.selfStake),
       );
@@ -714,6 +728,18 @@ export function createGenLayerGrudgeClient(): GrudgeClient {
       if (!entry)
         throw new Error("Appeal landed but the entry could not be read back.");
       return { txHash, entry };
+    },
+
+    async getAnchorInfo(id: string): Promise<AnchorInfo> {
+      // F5: bounded deterministic view — the code the creator must place on
+      // their anchor page before verify_anchor.
+      return readJson("get_anchor_code", [Number(id)], AnchorInfoSchema);
+    },
+
+    async verifyAnchor(id: string): Promise<TxResult> {
+      // F5: the validator set fetches the anchor page and strict_eq-checks the
+      // ownership code. The wallet is the caller on-chain (creator-gated).
+      return write("verify_anchor", [Number(id)]);
     },
 
     async settle(id: string): Promise<SettleResult> {

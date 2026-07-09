@@ -66,8 +66,20 @@ export const ChallengeSchema = z.object({
   verifiedCount: z.number().int().nonnegative(),
   status: ChallengeStatusSchema,
   evidence: z.array(EvidenceEntrySchema),
+  // F5 anchored proof: registered proof-source URL ("" = unanchored) and
+  // whether ownership was verified on-chain.
+  proofAnchor: z.string().default(""),
+  anchorVerified: z.boolean().default(false),
 });
 export type Challenge = z.infer<typeof ChallengeSchema>;
+
+/** F5: the contract's get_anchor_code JSON — ownership code + anchor status. */
+export const AnchorInfoSchema = z.object({
+  anchor: z.string(),
+  code: z.string(),
+  verified: z.boolean(),
+});
+export type AnchorInfo = z.infer<typeof AnchorInfoSchema>;
 
 export const ScreeningSchema = z.object({
   accepted: z.boolean(),
@@ -151,4 +163,6 @@ export interface CreateChallengeInput {
   durationDays: number;
   requiredProofs: number;
   selfStake: number;
+  /** F5: proof-source URL to anchor evidence to ("" = unanchored). */
+  proofAnchor: string;
 }

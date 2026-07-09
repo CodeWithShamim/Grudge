@@ -1,4 +1,5 @@
 import type {
+  AnchorInfo,
   Challenge,
   CreateChallengeInput,
   EvidenceEntry,
@@ -44,6 +45,11 @@ export interface GrudgeClient {
     evidenceIndex: number,
     bond: number,
   ): Promise<{ txHash: string; entry: EvidenceEntry }>;
+
+  /** F5: the ownership code + status for a challenge's proof anchor. */
+  getAnchorInfo(id: string): Promise<AnchorInfo>;
+  /** F5: consensus-verify the registered proof anchor (creator only). */
+  verifyAnchor(id: string, from: string): Promise<TxResult>;
 
   settle(id: string): Promise<SettleResult>;
 
