@@ -10,6 +10,7 @@ import {
   type JudgeResult,
   type Leaderboards,
   type Profile,
+  type Reputation,
   type Screening,
   type SettleResult,
   type Side,
@@ -18,6 +19,7 @@ import {
 
 const DAY = 24 * 60 * 60 * 1000;
 const RAKE_BPS = 200; // 2%, mirrors contracts/grudge.py
+const MIN_APPEAL_BOND_GEN = 0.1; // F1, mirrors MIN_APPEAL_BOND (0.1 GEN)
 
 /** Stable demo identity used when no wallet is connected in mock mode. */
 export const MOCK_ME = "0xY0uR5e1f0000000000000000000000000000DEMO";
@@ -55,8 +57,15 @@ async function remoteJudge(
 }
 
 export function seedChallenges(now: number): Challenge[] {
-  const mk = (c: Omit<Challenge, "believerPool" | "doubterPool">): Challenge => ({
+  // Seed evidence may omit the newer appeal fields; default them here so seed
+  // literals stay terse.
+  type SeedEvidence = Omit<EvidenceEntry, "appealed" | "appealBond"> &
+    Partial<Pick<EvidenceEntry, "appealed" | "appealBond">>;
+  const mk = (
+    c: Omit<Challenge, "believerPool" | "doubterPool" | "evidence"> & { evidence: SeedEvidence[] },
+  ): Challenge => ({
     ...c,
+    evidence: c.evidence.map((e) => ({ appealed: false, appealBond: 0, ...e })),
     believerPool: c.stakes.filter((s) => s.side === "believe").reduce((a, s) => a + s.amount, 0),
     doubterPool: c.stakes.filter((s) => s.side === "doubt").reduce((a, s) => a + s.amount, 0),
   });
@@ -273,6 +282,46 @@ export function createMockGrudgeClient(): GrudgeClient {
     };
   };
 
+  // F4: derive a reputation record from the store, mirroring the contract's
+  // counters + the dampened-ratio scoring.
+  const buildReputation = (address: string): Reputation => {
+    const all = [...store.challenges.values()];
+    const settled = all.filter((c) => c.status === "SETTLED" || c.status === "SUCCEEDED" || c.status === "FAILED");
+    const isMine = (a: string) => a.toLowerCase() === address.toLowerCase();
+
+    const created = settled.filter((c) => isMine(c.creator));
+    const won = created.filter((c) => c.verifiedCount >= c.requiredProofs).length;
+    const mineChallenges = all.filter((c) => isMine(c.creator));
+    const proofsVerified = mineChallenges.reduce(
+      (n, c) => n + c.evidence.filter((e) => e.verdict === "VERIFIED").length,
+      0,
+    );
+    const proofsRejected = mineChallenges.reduce(
+      (n, c) => n + c.evidence.filter((e) => e.verdict === "REJECTED").length,
+      0,
+    );
+
+    const doubtedIds = new Set(
+      settled.filter((c) => c.stakes.some((s) => s.side === "doubt" && isMine(s.address))).map((c) => c.id),
+    );
+    const doubtsMade = doubtedIds.size;
+    const doubtsCorrect = settled.filter(
+      (c) => doubtedIds.has(c.id) && c.verifiedCount < c.requiredProofs,
+    ).length;
+
+    return {
+      address,
+      challengesCreated: created.length,
+      challengesWon: won,
+      proofsVerified,
+      proofsRejected,
+      doubtsMade,
+      doubtsCorrect,
+      convictionScore: dampenedRatio(won, created.length),
+      doubterAccuracy: dampenedRatio(doubtsCorrect, doubtsMade),
+    };
+  };
+
   return {
     mode: "mock",
 
@@ -358,6 +407,8 @@ export function createMockGrudgeClient(): GrudgeClient {
         reason: result.reason,
         confidence: result.confidence,
         disputed: false,
+        appealed: false,
+        appealBond: 0,
         txHash: fakeTxHash(),
       };
       c.evidence.push(entry);
@@ -384,6 +435,35 @@ export function createMockGrudgeClient(): GrudgeClient {
         c.verifiedCount = Math.max(0, c.verifiedCount - 1);
       }
       entry.disputed = true;
+      return { txHash: fakeTxHash(), entry: structuredClone(entry) };
+    },
+
+    async appealVerdict(id: string, evidenceIndex: number, bond: number) {
+      // F1 mock: mirror the contract — appeal a REJECTED entry with a bond;
+      // flip→VERIFIED returns the bond, upheld→bond to the doubter pool.
+      const c = must(id);
+      const entry = c.evidence[evidenceIndex];
+      if (!entry) throw new Error("No such evidence entry.");
+      if (entry.verdict !== "REJECTED") throw new Error("Only rejected evidence can be appealed.");
+      if (entry.appealed) throw new Error("Already appealed.");
+      if (bond < MIN_APPEAL_BOND_GEN) throw new Error("Appeal bond too small.");
+      await delay(900);
+      const rejudge = (await remoteJudge("evidence", {
+        evidence: `APPEAL of "${entry.summary}" (was REJECTED): reconsider on merit.`,
+        statement: c.statement,
+        policy: c.evidencePolicy,
+      })) as JudgeResult;
+      entry.appealed = true;
+      entry.appealBond = bond;
+      if (rejudge.verdict === "VERIFIED") {
+        entry.verdict = "VERIFIED";
+        entry.reason = `Flipped on appeal: ${rejudge.reason}`;
+        entry.confidence = rejudge.confidence;
+        c.verifiedCount += 1;
+        // bond returned to creator (mock: surfaced via claimable on next read)
+      } else {
+        c.doubterPool += bond;
+      }
       return { txHash: fakeTxHash(), entry: structuredClone(entry) };
     },
 
@@ -487,5 +567,53 @@ export function createMockGrudgeClient(): GrudgeClient {
           .slice(0, 10),
       };
     },
+
+    async getReputation(address: string): Promise<Reputation> {
+      await delay(150);
+      return buildReputation(address);
+    },
+
+    async explainVerdict(id: string, evidenceIndex: number) {
+      // F3 mock: synthesize a referee-voice explanation from the stored entry
+      // (no real consensus in mock mode, but shape-identical to the contract).
+      await delay(400);
+      const c = must(id);
+      const e = c.evidence[evidenceIndex];
+      if (!e) throw new Error("no such evidence entry");
+      const lead =
+        e.verdict === "VERIFIED"
+          ? "I marked this VERIFIED because"
+          : e.verdict === "SUSPICIOUS"
+            ? "I marked this SUSPICIOUS because"
+            : "I rejected this because";
+      return {
+        verdict: e.verdict,
+        explanation: `${lead} ${e.reason || "the evidence was weighed against the policy"}. Measured against "${c.statement}", that's where it landed.`.slice(0, 600),
+      };
+    },
+
+    async suggestPolicy(statement: string) {
+      // F2 mock: synthesize a concrete policy (no LLM); shape matches contract.
+      await delay(500);
+      const s = statement.trim().replace(/\.$/, "");
+      return {
+        policy: `Each proof period, submit timestamped first-hand evidence (photo, link, or log) that directly shows "${s}". Self-reports without verifiable detail don't count.`.slice(
+          0,
+          280,
+        ),
+        rationale:
+          "Requires fresh, timestamped, third-party-checkable proof so a vague claim can't pass.".slice(
+            0,
+            280,
+          ),
+      };
+    },
   };
+}
+
+// F4: dampened-ratio formula, mirroring the contract (CONVICTION_DAMPENER = 3).
+const CONVICTION_DAMPENER = 3;
+function dampenedRatio(num: number, denom: number): number {
+  if (denom <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.floor((100 * num) / (denom + CONVICTION_DAMPENER))));
 }

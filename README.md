@@ -116,19 +116,25 @@ ships **no** auth/chain JS.
 
 | Method | Kind | Purpose |
 | --- | --- | --- |
-| `create_challenge(statement, evidence_policy, category, duration_days, required_proofs)` | `write.payable` | Open a grudge; the GEN sent is your self-stake. |
+| `create_challenge(statement, evidence_policy, category, duration_days, required_proofs)` | `write.payable` | Open a grudge; the GEN sent is your self-stake. A blank `evidence_policy` is AI-designed. |
 | `stake(challenge_id, side, taunt)` | `write.payable` | Back (`believe`) or bet against (`doubt`) with an optional public taunt. |
 | `submit_evidence(challenge_id, evidence_text)` | `write` | Submit a proof; validators reach consensus on the verdict. |
 | `dispute_evidence(challenge_id, index, counter_evidence)` | `write` | Challenge a `VERIFIED` entry; consensus re-judges. |
+| `appeal_verdict(challenge_id, evidence_index)` | `write.payable` | Appeal a `REJECTED` proof with a bond; consensus re-judges (bond returned on flip, else forfeited). |
 | `settle(challenge_id)` | `write` | After the deadline, resolve and credit winners' ledgers. |
 | `claim()` | `write` | Withdraw your settled winnings. |
 | `get_challenge` · `get_challenge_summary` | `view` | Full / bounded single-challenge reads. |
 | `get_challenges_page(offset, limit)` | `view` | Paginated **summaries** (no nested arrays) — the only list read. |
 | `get_stakes_page` · `get_evidence_page` | `view` | Paginate a single challenge's stakes / evidence. |
 | `get_claimable(address)` · `get_solvency()` | `view` | Withdrawable balance · contract liability invariant. |
+| `get_reputation(address)` | `view` | On-chain conviction rating: kept/broken counters + deterministic 0–100 scores. |
+| `explain_verdict(challenge_id, evidence_index)` | `view` | The referee's reasoning for an existing verdict (consensus, never re-judges). |
+| `suggest_evidence_policy(statement)` | `view` | Preview an AI-designed evidence policy for a statement. |
 
 > All list/detail reads are **bounded** — there is no unbounded view, so views
-> never revert as the ledger grows.
+> never revert as the ledger grows. Views marked above as running consensus
+> (`explain_verdict`, `suggest_evidence_policy`) invoke the validator-LLM panel
+> but never touch storage. See [CHANGELOG.md](CHANGELOG.md) for ABI deltas.
 
 ### Live deployment
 

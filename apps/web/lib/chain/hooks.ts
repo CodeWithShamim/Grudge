@@ -21,6 +21,7 @@ export const qk = {
   profile: (address: string) => ["profile", address] as const,
   leaderboards: ["leaderboards"] as const,
   claimable: (address: string) => ["claimable", address] as const,
+  reputation: (address: string) => ["reputation", address] as const,
 };
 
 /** The acting identity: connected wallet, or the demo identity in mock mode. */
@@ -89,6 +90,37 @@ export function useProfile(address: string) {
   return useQuery({
     queryKey: qk.profile(address),
     queryFn: async () => (await getGrudgeClient()).getProfile(address),
+  });
+}
+
+/** F4: on-chain conviction rating for an address. */
+export function useReputation(address: string | undefined) {
+  return useQuery({
+    queryKey: qk.reputation(address ?? ""),
+    queryFn: async () => (await getGrudgeClient()).getReputation(address!),
+    enabled: !!address,
+    staleTime: 60_000,
+  });
+}
+
+/**
+ * F3: explain a verdict on demand (read-only consensus). A mutation, not a
+ * query, because it's triggered by a user click and each call is a fresh
+ * consensus round — we don't want it auto-firing or background-refetching.
+ */
+export function useExplainVerdict(challengeId: string) {
+  return useMutation({
+    mutationFn: async (evidenceIndex: number) =>
+      (await getGrudgeClient()).explainVerdict(challengeId, evidenceIndex),
+    onError: (e) => toast.error("Couldn't explain this verdict", { description: e.message }),
+  });
+}
+
+/** F2: ask the AI to design a fair evidence policy for a statement. */
+export function useSuggestPolicy() {
+  return useMutation({
+    mutationFn: async (statement: string) => (await getGrudgeClient()).suggestPolicy(statement),
+    onError: (e) => toast.error("Couldn't design a policy", { description: e.message }),
   });
 }
 
@@ -173,6 +205,26 @@ export function useDisputeEvidence(challengeId: string) {
     },
     onError: (e) => errToast("Dispute failed", e),
     onSettled: () => void qc.invalidateQueries({ queryKey: qk.challenge(challengeId) }),
+  });
+}
+
+/** F1: appeal a REJECTED verdict with a bond. */
+export function useAppealVerdict(challengeId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { evidenceIndex: number; bond: number }) =>
+      (await getGrudgeClient()).appealVerdict(challengeId, vars.evidenceIndex, vars.bond),
+    onSuccess: ({ entry, txHash }) => {
+      txToast(
+        entry.verdict === "VERIFIED" ? "Appeal won. Verdict flipped — bond returned." : "Appeal heard. Verdict stands.",
+        txHash,
+      );
+    },
+    onError: (e) => errToast("Appeal failed", e),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: qk.challenge(challengeId) });
+      void qc.invalidateQueries({ queryKey: ["claimable"] });
+    },
   });
 }
 

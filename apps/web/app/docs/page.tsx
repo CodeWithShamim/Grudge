@@ -37,6 +37,14 @@ const FAQ: { q: string; a: string }[] = [
     a: "The judging prompt evaluates the proof against the grudge's evidence policy, and prompt-injection attempts embedded in evidence are adjudicated by the same consensus and rejected. A verified entry can also be disputed with counter-evidence, which triggers a re-judgement.",
   },
   {
+    q: "What if I think a rejection was wrong?",
+    a: "You can appeal it. The appeal_verdict method bonds some GEN and triggers a fresh GenLayer consensus round that re-judges the proof on its merits. If the panel flips the verdict to VERIFIED, your bond is returned and the proof counts; if the rejection is upheld, the bond is forfeited to the doubter pool. Each proof can be appealed once.",
+  },
+  {
+    q: "What is a conviction rating?",
+    a: "GRUDGE keeps an on-chain reputation for each address derived from kept-versus-broken history, plus how often a doubter's bets were right. The conviction_score and doubter_accuracy are computed deterministically (no LLM) with a volume dampener, so a high rating must be earned over many grudges rather than a single lucky result. It's shown next to creators and doubters across the app.",
+  },
+  {
     q: "Do I need GEN to play?",
     a: "To create a grudge or stake you need GEN, since those calls carry value. On GenLayer Studio your embedded wallet is auto-funded with simulated GEN the first time it's empty, so you start ready to act. Reading and browsing the ledger cost nothing and require no sign-in.",
   },

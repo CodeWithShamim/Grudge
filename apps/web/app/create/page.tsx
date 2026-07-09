@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { sharedAxis } from "@/lib/motion/variants";
 import { useReducedMotionSafe } from "@/lib/motion/useReducedMotionSafe";
 import { getGrudgeClient } from "@/lib/chain/client";
-import { useCreateChallenge } from "@/lib/chain/hooks";
+import { useCreateChallenge, useSuggestPolicy } from "@/lib/chain/hooks";
 import { MIN_STAKE_GEN, type Screening } from "@/lib/chain/types";
 import { Button } from "@/components/ui/Button";
 
@@ -39,6 +39,7 @@ export default function CreatePage() {
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState<1 | -1>(1);
   const [statement, setStatement] = useState<string>(DEFAULTS.statement);
+  const suggest = useSuggestPolicy();
   const [screening, setScreening] = useState<Screening | null>(null);
   const [screeningPending, setScreeningPending] = useState(false);
   const [policy, setPolicy] = useState<string>(DEFAULTS.policy);
@@ -147,17 +148,36 @@ export default function CreatePage() {
         {step === 1 && (
           <motion.section key="s1" variants={variants} initial="enter" animate="center" exit="exit" className="space-y-6">
             <div>
-              <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-mut" htmlFor="policy">
-                Evidence policy - what counts as proof?
-              </label>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <label className="block font-mono text-xs uppercase tracking-widest text-mut" htmlFor="policy">
+                  Evidence policy - what counts as proof?
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    suggest.mutate(statement.trim(), {
+                      onSuccess: (res) => setPolicy(res.policy),
+                    });
+                  }}
+                  disabled={suggest.isPending || statement.trim().length < 12}
+                  className="font-mono text-[10px] uppercase tracking-widest text-gold transition-opacity hover:opacity-80 disabled:opacity-40"
+                >
+                  {suggest.isPending ? "designing…" : "✨ suggest a fair policy"}
+                </button>
+              </div>
               <textarea
                 id="policy"
                 value={policy}
                 onChange={(e) => setPolicy(e.target.value)}
                 rows={2}
-                placeholder="Strava screenshot or activity link per day, distance ≥ 5.0km"
+                placeholder="Strava screenshot or activity link per day, distance ≥ 5.0km — or leave blank to let the AI design one"
                 className="w-full resize-none rounded-control border border-ink-line bg-ink-soft px-4 py-3 text-sm text-paper placeholder:text-mut/50 focus:border-gold focus:outline-none"
               />
+              {suggest.data?.rationale && (
+                <p className="mt-2 font-sans text-xs text-mut">
+                  <span className="text-gold">Why this is hard to game:</span> {suggest.data.rationale}
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <NumberField label="Duration (days)" value={durationDays} onChange={setDurationDays} min={3} max={365} />

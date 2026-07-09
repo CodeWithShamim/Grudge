@@ -11,6 +11,8 @@ import { Button } from "./ui/Button";
 import { ValidatorArc } from "./ValidatorArc";
 import { VerdictStamp } from "./VerdictStamp";
 import { EmptyState } from "./ui/EmptyState";
+import { ExplainVerdict } from "./ExplainVerdict";
+import { AppealAction } from "./AppealAction";
 
 type TribunalPhase =
   | { name: "idle" }
@@ -118,8 +120,11 @@ export function EvidenceTribunal({ challenge, className }: { challenge: Challeng
               <EvidenceRow
                 key={index}
                 entry={entry}
+                challengeId={challenge.id}
+                evidenceIndex={index}
                 disputing={disputeFor === index}
                 canDispute={!isCreator && entry.verdict === "VERIFIED" && !entry.disputed && challenge.status === "ACTIVE"}
+                canAppeal={isCreator && entry.verdict === "REJECTED" && challenge.status === "ACTIVE"}
                 counterText={counterText}
                 onCounterText={setCounterText}
                 onOpenDispute={() => setDisputeFor(index)}
@@ -137,8 +142,11 @@ export function EvidenceTribunal({ challenge, className }: { challenge: Challeng
 
 function EvidenceRow({
   entry,
+  challengeId,
+  evidenceIndex,
   disputing,
   canDispute,
+  canAppeal,
   counterText,
   onCounterText,
   onOpenDispute,
@@ -147,8 +155,11 @@ function EvidenceRow({
   disputePending,
 }: {
   entry: EvidenceEntry;
+  challengeId: string;
+  evidenceIndex: number;
   disputing: boolean;
   canDispute: boolean;
+  canAppeal: boolean;
   counterText: string;
   onCounterText: (s: string) => void;
   onOpenDispute: () => void;
@@ -166,6 +177,7 @@ function EvidenceRow({
           </p>
           <p className="truncate text-sm text-paper/90">{entry.summary}</p>
           <p className="mt-1 text-xs text-mut">{entry.reason}</p>
+          <ExplainVerdict challengeId={challengeId} evidenceIndex={evidenceIndex} />
         </div>
         <div className="shrink-0 text-right">
           <span className={cn("font-mono text-xs font-bold", VERDICT_TEXT[entry.verdict])}>{entry.verdict}</span>
@@ -179,6 +191,13 @@ function EvidenceRow({
         >
           Dispute this →
         </button>
+      )}
+      {canAppeal && (
+        <AppealAction
+          challengeId={challengeId}
+          evidenceIndex={evidenceIndex}
+          appealed={entry.appealed}
+        />
       )}
       <AnimatePresence>
         {disputing && (

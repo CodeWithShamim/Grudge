@@ -13,6 +13,7 @@ import { TugOfWar } from "./TugOfWar";
 import { Countdown } from "./Countdown";
 import { ProofGrid } from "./ProofGrid";
 import { DoubterBench } from "./DoubterBench";
+import { ConvictionBadge } from "./ConvictionBadge";
 import { EvidenceTribunal } from "./EvidenceTribunal";
 import { StakePanel } from "./StakePanel";
 import { SettleTakeover } from "./SettleTakeover";
@@ -66,9 +67,10 @@ export function ChallengeView({ id }: { id: string }) {
       {/* ticket header (shared element with the feed card) */}
       <motion.header variants={pick(fadeRise)} className="grain relative mb-8 rounded-card bg-ink-soft p-6 shadow-e3">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-widest text-mut">
-          <span>
+          <span className="flex flex-wrap items-center gap-x-2">
             grudge #{challenge.id} · {challenge.category} · by {shortAddress(challenge.creator)}
             {isCreator && " (you)"}
+            <ConvictionBadge address={challenge.creator} kind="creator" />
           </span>
           <span>
             self-stake <GenAmount value={challenge.selfStake} className="text-gold" />

@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { cn, shortAddress } from "@/lib/utils";
+import { ConvictionBadge } from "./ConvictionBadge";
 import { staggerList, tauntPop } from "@/lib/motion/variants";
 import { useReducedMotionSafe } from "@/lib/motion/useReducedMotionSafe";
 import { EMPTY_STATES } from "@/lib/psychology/copy";
@@ -38,7 +39,10 @@ export function DoubterBench({ challenge, className }: { challenge: Challenge; c
           className="grain relative rounded-card bg-ink-soft p-4 shadow-e1"
         >
           <div className="flex items-center justify-between gap-3">
-            <span className="font-mono text-xs text-doubt">{shortAddress(s.address)}</span>
+            <span className="flex flex-wrap items-center gap-x-2 font-mono text-xs text-doubt">
+              {shortAddress(s.address)}
+              <ConvictionBadge address={s.address} kind="doubter" />
+            </span>
             <GenAmount value={s.amount} className="text-sm text-doubt" />
           </div>
           {s.taunt && <p className="mt-2 text-sm italic text-paper/90">&ldquo;{s.taunt}&rdquo;</p>}

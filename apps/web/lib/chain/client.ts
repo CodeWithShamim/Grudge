@@ -4,6 +4,7 @@ import type {
   EvidenceEntry,
   Leaderboards,
   Profile,
+  Reputation,
   Screening,
   SettleResult,
   Side,
@@ -37,6 +38,12 @@ export interface GrudgeClient {
     counterEvidence: string,
     from: string,
   ): Promise<{ txHash: string; entry: EvidenceEntry }>;
+  /** F1: appeal a REJECTED verdict with a bond (GEN). */
+  appealVerdict(
+    id: string,
+    evidenceIndex: number,
+    bond: number,
+  ): Promise<{ txHash: string; entry: EvidenceEntry }>;
 
   settle(id: string): Promise<SettleResult>;
 
@@ -47,6 +54,12 @@ export interface GrudgeClient {
 
   getProfile(address: string): Promise<Profile>;
   getLeaderboards(): Promise<Leaderboards>;
+  /** F4: on-chain conviction rating for an address. */
+  getReputation(address: string): Promise<Reputation>;
+  /** F3: the referee's reasoning for an existing verdict (does not re-judge). */
+  explainVerdict(id: string, evidenceIndex: number): Promise<{ verdict: string; explanation: string }>;
+  /** F2: AI-designed evidence policy for a statement (preview, creates nothing). */
+  suggestPolicy(statement: string): Promise<{ policy: string; rationale: string }>;
 }
 
 export type ChainMode = "mock" | "genlayer";

@@ -8,6 +8,7 @@ import { useClaim, useClaimable, useProfile, useViewer } from "@/lib/chain/hooks
 import { EMPTY_STATES } from "@/lib/psychology/copy";
 import { shortAddress } from "@/lib/utils";
 import { GenAmount } from "./ui/GenAmount";
+import { ConvictionBadge } from "./ConvictionBadge";
 import { EmptyState } from "./ui/EmptyState";
 import { Pagination, usePagination } from "./ui/Pagination";
 
@@ -46,6 +47,10 @@ export function ProfileView({ address }: { address: string }) {
       <motion.header variants={pick(fadeRise)} className="mb-8">
         <p className="font-mono text-xs uppercase tracking-widest text-mut">the record of</p>
         <h1 className="display-statement text-display-lg text-paper">{shortAddress(address)}</h1>
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+          <ConvictionBadge address={address} kind="creator" />
+          <ConvictionBadge address={address} kind="doubter" />
+        </div>
       </motion.header>
 
       <motion.div variants={pick(fadeRise)} className="mb-12 grid grid-cols-2 gap-4 sm:grid-cols-4">

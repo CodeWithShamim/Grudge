@@ -5,12 +5,14 @@ import { friendlyError } from "./errors";
 import { emitTxStatus } from "./txStatus";
 import {
   ChallengeSchema,
+  ReputationSchema,
   ScreeningSchema,
   type Challenge,
   type CreateChallengeInput,
   type EvidenceEntry,
   type Leaderboards,
   type Profile,
+  type Reputation,
   type Screening,
   type SettleResult,
   type Side,
@@ -82,6 +84,8 @@ const RawChallengeSchema = z.object({
       reason: z.string(),
       confidence: z.number(),
       disputed: z.boolean().default(false),
+      appealed: z.boolean().default(false),
+      appeal_bond: z.string().default("0"),
     }),
   ),
 });
@@ -108,7 +112,10 @@ function adaptChallenge(raw: z.infer<typeof RawChallengeSchema>): Challenge {
     requiredProofs: raw.required_proofs,
     verifiedCount: raw.verified_count,
     status: raw.status,
-    evidence: raw.evidence,
+    evidence: raw.evidence.map((e) => ({
+      ...e,
+      appealBond: fromUnits(BigInt(e.appeal_bond)),
+    })),
   });
 }
 
@@ -695,6 +702,20 @@ export function createGenLayerGrudgeClient(): GrudgeClient {
       return { txHash, entry };
     },
 
+    async appealVerdict(id: string, evidenceIndex: number, bond: number) {
+      // F1: payable — the bond is sent as value with the appeal.
+      const { txHash } = await write(
+        "appeal_verdict",
+        [Number(id), evidenceIndex],
+        toUnits(bond),
+      );
+      const challenge = await this.getChallenge(id);
+      const entry = challenge.evidence[evidenceIndex];
+      if (!entry)
+        throw new Error("Appeal landed but the entry could not be read back.");
+      return { txHash, entry };
+    },
+
     async settle(id: string): Promise<SettleResult> {
       const { txHash } = await write("settle", [Number(id)]);
       const c = await this.getChallenge(id);
@@ -779,5 +800,60 @@ export function createGenLayerGrudgeClient(): GrudgeClient {
           .slice(0, 10),
       };
     },
+
+    async getReputation(address: string): Promise<Reputation> {
+      // F4: get_reputation returns a bounded, fixed-size snake_case object.
+      const raw = await readJson("get_reputation", [address], RawReputationSchema);
+      return adaptReputation(raw);
+    },
+
+    async explainVerdict(id: string, evidenceIndex: number) {
+      // F3: read-only consensus view — never re-judges. Bounded to 600 chars.
+      return readJson("explain_verdict", [Number(id), evidenceIndex], ExplainSchema);
+    },
+
+    async suggestPolicy(statement: string) {
+      // F2: read-only consensus — designs a policy, creates nothing.
+      return readJson("suggest_evidence_policy", [statement], SuggestSchema);
+    },
   };
+}
+
+/** F3 explain_verdict output. */
+const ExplainSchema = z.object({
+  verdict: z.string(),
+  explanation: z.string().max(600),
+});
+
+/** F2 suggest_evidence_policy output. */
+const SuggestSchema = z.object({
+  policy: z.string().max(280),
+  rationale: z.string().max(280),
+});
+
+/** Raw snake_case shape from contracts/grudge.py get_reputation. */
+const RawReputationSchema = z.object({
+  address: z.string(),
+  challenges_created: z.number(),
+  challenges_won: z.number(),
+  proofs_verified: z.number(),
+  proofs_rejected: z.number(),
+  doubts_made: z.number(),
+  doubts_correct: z.number(),
+  conviction_score: z.number(),
+  doubter_accuracy: z.number(),
+});
+
+function adaptReputation(raw: z.infer<typeof RawReputationSchema>): Reputation {
+  return ReputationSchema.parse({
+    address: raw.address,
+    challengesCreated: raw.challenges_created,
+    challengesWon: raw.challenges_won,
+    proofsVerified: raw.proofs_verified,
+    proofsRejected: raw.proofs_rejected,
+    doubtsMade: raw.doubts_made,
+    doubtsCorrect: raw.doubts_correct,
+    convictionScore: raw.conviction_score,
+    doubterAccuracy: raw.doubter_accuracy,
+  });
 }

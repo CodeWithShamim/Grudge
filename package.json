@@ -15,7 +15,8 @@
     "contracts:check": "make -C contracts check",
     "contracts:typecheck": "make -C contracts typecheck",
     "contracts:test": "make -C contracts test",
-    "prepare": "husky || true"
+    "prepare": "husky || true",
+    "check": ".venv/bin/genvm-lint lint contracts/grudge.py && .venv/bin/gltest contracts/test/test_grudge.py -v"
   },
   "devDependencies": {
     "husky": "^9.1.7"

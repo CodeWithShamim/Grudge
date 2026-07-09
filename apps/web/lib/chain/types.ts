@@ -34,6 +34,9 @@ export const EvidenceEntrySchema = z.object({
   reason: z.string(),
   confidence: z.number().int().min(0).max(100),
   disputed: z.boolean().default(false),
+  // F1 appeals
+  appealed: z.boolean().default(false),
+  appealBond: z.number().nonnegative().default(0),
   txHash: z.string().optional(),
 });
 export type EvidenceEntry = z.infer<typeof EvidenceEntrySchema>;
@@ -109,6 +112,24 @@ export const ProfileSchema = z.object({
   currentStreak: z.number().int().nonnegative(),
 });
 export type Profile = z.infer<typeof ProfileSchema>;
+
+/**
+ * F4 conviction rating — the contract's get_reputation JSON. Raw counters plus
+ * two deterministic 0-100 derived scores. All fields are display values; never
+ * trust them for authorization (chain is truth).
+ */
+export const ReputationSchema = z.object({
+  address: z.string(),
+  challengesCreated: z.number().int().nonnegative(),
+  challengesWon: z.number().int().nonnegative(),
+  proofsVerified: z.number().int().nonnegative(),
+  proofsRejected: z.number().int().nonnegative(),
+  doubtsMade: z.number().int().nonnegative(),
+  doubtsCorrect: z.number().int().nonnegative(),
+  convictionScore: z.number().int().min(0).max(100),
+  doubterAccuracy: z.number().int().min(0).max(100),
+});
+export type Reputation = z.infer<typeof ReputationSchema>;
 
 export const LeaderboardsSchema = z.object({
   mostUnbreakable: z.array(z.object({ address: z.string(), kept: z.number(), broken: z.number() })),

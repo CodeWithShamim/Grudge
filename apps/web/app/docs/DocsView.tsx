@@ -249,6 +249,16 @@ result = gl.eq_principle_prompt_comparative(
               disputer submits counter-evidence and consensus re-judges. If the dispute holds, the
               verdict flips.
             </p>
+            <p>
+              A <Term>REJECTED</Term> proof can be <span className="text-paper">appealed</span> by the
+              creator with <Term>appeal_verdict</Term>, which carries a bond. A fresh consensus round
+              re-judges: flip to <Term>VERIFIED</Term> and the bond comes back (and the proof counts);
+              upheld and the bond is forfeited to the doubter pool. One appeal per entry.
+            </p>
+            <p className="text-mut">
+              Curious why a verdict landed the way it did? <Term>explain_verdict</Term> returns the
+              referee&rsquo;s full reasoning via consensus — without changing the outcome.
+            </p>
           </Section>
 
           <Section id="payouts" title="Stakes & payouts">
@@ -282,16 +292,20 @@ result = gl.eq_principle_prompt_comparative(
                 </thead>
                 <tbody className="divide-y divide-ink-line">
                   {[
-                    ["create_challenge(statement, evidence_policy, category, duration_days, required_proofs)", "write · payable", "Open a grudge; GEN sent is your self-stake."],
+                    ["create_challenge(statement, evidence_policy, category, duration_days, required_proofs)", "write · payable", "Open a grudge; GEN sent is your self-stake. A blank policy is AI-designed."],
                     ["stake(challenge_id, side, taunt)", "write · payable", "Back (believe) or bet against (doubt), with an optional taunt."],
                     ["submit_evidence(challenge_id, evidence_text)", "write", "Submit a proof; validators reach consensus on the verdict."],
                     ["dispute_evidence(challenge_id, index, counter)", "write", "Challenge a VERIFIED entry; consensus re-judges."],
+                    ["appeal_verdict(challenge_id, evidence_index)", "write · payable", "Appeal a REJECTED proof with a bond; bond returns on flip, else forfeited."],
                     ["settle(challenge_id)", "write", "After the deadline, resolve and credit winners."],
                     ["claim()", "write", "Withdraw your settled winnings."],
                     ["get_challenges_page(offset, limit)", "view", "Paginated summaries — the only list read (bounded, no nested arrays)."],
                     ["get_challenge / get_challenge_summary", "view", "Full or bounded single-challenge read."],
                     ["get_stakes_page / get_evidence_page", "view", "Paginate one challenge's stakes / evidence."],
                     ["get_claimable(address) / get_solvency()", "view", "Withdrawable balance · contract liability invariant."],
+                    ["get_reputation(address)", "view", "Conviction rating: kept/broken counters + deterministic 0–100 scores."],
+                    ["explain_verdict(challenge_id, evidence_index)", "view", "The referee's reasoning for a verdict (consensus, never re-judges)."],
+                    ["suggest_evidence_policy(statement)", "view", "Preview an AI-designed evidence policy for a statement."],
                   ].map(([m, k, p]) => (
                     <tr key={m} className="align-top">
                       <td className="px-4 py-3 font-mono text-[12px] text-paper/90">{m}</td>
@@ -311,6 +325,8 @@ result = gl.eq_principle_prompt_comparative(
                 ["Do I have to confirm every transaction?", <>No. Your embedded wallet signs silently, so creating, staking, submitting evidence, settling, and claiming all happen without a popup or fee prompt.</>],
                 ["Who decides if I kept my promise?", <>No one person. The GenLayer validator set each runs the contract’s judging prompt and reaches consensus on the verdict. The result is on-chain and auditable.</>],
                 ["What stops someone faking evidence?", <>The judging prompt evaluates the proof against the grudge’s evidence policy, and prompt-injection attempts are adjudicated by the same consensus and rejected. A verified entry can still be disputed.</>],
+                ["What if I think a rejection was wrong?", <>Appeal it. <Term>appeal_verdict</Term> bonds some GEN and triggers a fresh consensus round. If the panel flips to VERIFIED, your bond returns and the proof counts; if it’s upheld, the bond goes to the doubters. One appeal per proof.</>],
+                ["What is a conviction rating?", <>An on-chain reputation from your kept-vs-broken history (and, for doubters, how often you were right). It’s computed deterministically with a volume dampener, so a high score must be earned over many grudges — shown next to creators and doubters everywhere.</>],
                 ["Do I need GEN to play?", <>To create a grudge or stake, yes - those calls carry value. On GenLayer Studio your wallet is auto-funded with test GEN, so you start ready. Reading and browsing the ledger cost nothing and need no sign-in.</>],
                 ["Can I try it without signing in?", <>Yes. The app ships a zero-config mock mode with seeded grudges, so you can play the whole loop locally before connecting to a real network.</>],
               ].map(([q, a], i) => (
