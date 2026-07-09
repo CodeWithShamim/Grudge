@@ -876,18 +876,30 @@ class Grudge(gl.Contract):
         code = self._anchor_code(challenge_id, c.creator)
 
         def check_page() -> str:
+            # web.get does a PLAIN HTTP GET, so response.body is the RAW HTML
+            # SOURCE — including the <head> meta tags where login-walled profiles
+            # (Strava / X / Instagram) echo the owner's name + ownership code.
+            # web.render cannot help here: mode="text" returns the visible
+            # login-wall text and mode="html" returns the <body> only — both drop
+            # <head>, so a code living in a <meta> tag is never seen (docs:
+            # intelligent-contracts/examples/fetch-web-content).
+            source = ""
             try:
                 resp = gl.nondet.web.get(anchor)
                 raw = resp.body if resp is not None else b""
                 source = (
                     raw.decode("utf-8", "ignore") if isinstance(raw, bytes) else str(raw or "")
                 ).lower()
-                if not source:
-                    # web.get unavailable/empty on this runner — fall back to the
-                    # rendered DOM serialized as HTML, which also carries <head>.
-                    source = str(gl.nondet.web.render(anchor, mode="html") or "").lower()
-            except Exception:  # noqa: BLE001 — an unreachable page is a clean failure, not a crash
-                return "FETCH_FAILED"
+            except Exception:  # noqa: BLE001 — plain GET blocked/unreachable; fall through to render
+                source = ""
+            if not source:
+                # Last resort for hosts that block a plain GET but serve a
+                # browser: the visible rendered text (only finds a code placed in
+                # anonymously-visible body copy, not one hidden in <head>).
+                try:
+                    source = str(gl.nondet.web.render(anchor, mode="text") or "").lower()
+                except Exception:  # noqa: BLE001 — an unreachable page is a clean failure
+                    return "FETCH_FAILED"
             return "FOUND" if code in source else "NOT_FOUND"
 
         outcome = gl.eq_principle.strict_eq(check_page)
