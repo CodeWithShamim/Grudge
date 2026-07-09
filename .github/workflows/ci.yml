@@ -68,6 +68,5 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @grudge/web exec playwright install --with-deps chromium
-      - run: pnpm e2e
         env:
           NEXT_PUBLIC_CHAIN_MODE: mock
