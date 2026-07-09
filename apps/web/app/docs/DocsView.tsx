@@ -32,6 +32,13 @@ const SECTIONS = [
  */
 const PREVIOUS_DEPLOYMENTS = [
   {
+    address: "0x503Cd4D2f88520c1f8a6455cC958199508789817",
+    explorer:
+      "https://explorer-studio.genlayer.com/address/0x503Cd4D2f88520c1f8a6455cC958199508789817",
+    label: "GenLayer Studio · v6 (schema 4)",
+    note: "anchored proof — optional (pre-mandatory-anchor)",
+  },
+  {
     address: "0xb9b501D7c617Cd26d93B61BA996fc67a6002379c",
     explorer:
       "https://explorer-studio.genlayer.com/address/0xb9b501D7c617Cd26d93B61BA996fc67a6002379c",

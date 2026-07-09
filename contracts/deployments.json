@@ -5,11 +5,23 @@
     "chainId": 61999,
     "rpc": "https://studio.genlayer.com/api",
     "explorer": "https://explorer-studio.genlayer.com",
-    "address": "0x503Cd4D2f88520c1f8a6455cC958199508789817",
+    "address": "0x6A21dc70A225dD2179F0E0EE96E0eFF7210E27f7",
     "deployedAt": "2026-07-09",
     "schemaVersion": 4,
     "status": "current",
-    "notes": "v6 Anchored Proof (F5): verify_anchor + get_anchor_code, create_challenge gained proof_anchor param"
+    "notes": "v6.1 Anchored Proof (F5) with MANDATORY proof anchor: create_challenge now rejects an empty proof_anchor, so every challenge must verify_anchor before evidence"
+  },
+  {
+    "contract": "grudge.py",
+    "network": "studionet",
+    "chainId": 61999,
+    "rpc": "https://studio.genlayer.com/api",
+    "explorer": "https://explorer-studio.genlayer.com",
+    "address": "0x503Cd4D2f88520c1f8a6455cC958199508789817",
+    "deployedAt": "2026-07-09",
+    "schemaVersion": 4,
+    "status": "previous",
+    "notes": "v6 Anchored Proof (F5): verify_anchor + get_anchor_code, create_challenge gained proof_anchor param (still OPTIONAL — superseded by the mandatory-anchor redeploy)"
   },
   {
     "contract": "grudge.py",

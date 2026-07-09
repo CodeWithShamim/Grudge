@@ -42,8 +42,8 @@ export function TicketCard({ challenge, className }: { challenge: Challenge; cla
   const badge = STATUS_BADGE[challenge.status];
 
   return (
-    <motion.div variants={pick(fadeRise)} className={cn("group", className)}>
-      <Link href={`/challenge/${challenge.id}`} className="block focus-visible:outline-none">
+    <motion.div variants={pick(fadeRise)} className={cn("group h-full", className)}>
+      <Link href={`/challenge/${challenge.id}`} className="block h-full focus-visible:outline-none">
         <motion.article
           onPointerMove={onPointerMove}
           onPointerLeave={() => {
@@ -51,7 +51,7 @@ export function TicketCard({ challenge, className }: { challenge: Challenge; cla
             my.set(0.5);
           }}
           style={prefersReduced ? undefined : { rotateX, rotateY, transformPerspective: 900 }}
-          className="grain relative overflow-hidden rounded-card bg-ink-soft p-5 shadow-e2 transition-shadow duration-200 group-hover:shadow-e3 group-focus-visible:ring-2 group-focus-visible:ring-gold"
+          className="grain relative flex h-full flex-col overflow-hidden rounded-card bg-ink-soft p-5 shadow-e2 transition-shadow duration-200 group-hover:shadow-e3 group-focus-visible:ring-2 group-focus-visible:ring-gold"
         >
           {/* specular highlight */}
           {!prefersReduced && (
@@ -71,13 +71,21 @@ export function TicketCard({ challenge, className }: { challenge: Challenge; cla
             </span>
           </div>
 
-          <h3 className="display-statement mb-2 text-display-md text-paper" data-shared={`statement-${challenge.id}`}>
+          <h3
+            className="display-statement mb-2 line-clamp-2 min-h-[2.1em] text-display-md text-paper"
+            data-shared={`statement-${challenge.id}`}
+          >
             {challenge.statement}
           </h3>
 
-          <p className="mb-4 font-mono text-xs text-gold">{oddsLine(challenge)}</p>
+          <p className="mb-4 line-clamp-1 font-mono text-xs text-gold">{oddsLine(challenge)}</p>
 
-          <TugOfWar believe={challenge.believerPool + challenge.selfStake} doubt={challenge.doubterPool} compact />
+          <TugOfWar
+            believe={challenge.believerPool + challenge.selfStake}
+            doubt={challenge.doubterPool}
+            compact
+            className="mt-auto"
+          />
 
           <div className="mt-3 flex items-center justify-between">
             <Countdown endsAt={challenge.endsAt} className="text-xs" />

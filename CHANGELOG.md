@@ -6,6 +6,25 @@ storage layout (`SCHEMA_VERSION`).
 
 ---
 
+## v6.1 — Mandatory Anchored Proof (2026-07-09)
+
+Tightens Anchored Proof from opt-in to required: `create_challenge` now rejects
+an empty `proof_anchor`, so **every** challenge registers a proof source and
+must `verify_anchor` before it can accept evidence. The "casual/unanchored"
+text-only proof path is gone — all evidence must link to the verified host.
+
+> **⚠️ Requires a fresh deploy.** No storage-layout change (`SCHEMA_VERSION`
+> stays **4**), but the create-time validation changed, so a redeploy makes the
+> new rule explicit. The frontend create wizard marks the proof source
+> **required** and `ProofAnchor` adds a copy-to-clipboard for the ownership code.
+
+### Deployed — 2026-07-09
+
+- **GenLayer Studio: [`0x6A21dc70A225dD2179F0E0EE96E0eFF7210E27f7`](https://explorer-studio.genlayer.com/address/0x6A21dc70A225dD2179F0E0EE96E0eFF7210E27f7)** (schema 4, mandatory anchor). `apps/web/.env.local`, `contracts/deployments.json`, and the README deployment table all point here.
+- The prior optional-anchor v6 (`0x503Cd4…9817`) drops to **previous** in `deployments.json`, the README table, and the docs "previous deployments" list.
+
+---
+
 ## v6 — Anchored Proof (2026-07-09)
 
 Moves the proof boundary from "validators judge submitted text" to "validators

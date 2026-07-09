@@ -18,7 +18,7 @@ Every doubt recorded · every receipt public · refereed by GenLayer validator c
 
 | Network                       | Contract address                             | Version                        | Explorer                                                                                                   |
 | ----------------------------- | -------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| **GenLayer Studio** (current) | `0x503Cd4D2f88520c1f8a6455cC958199508789817` | v6 · schema 4 (Anchored Proof) | [view contract ↗](https://explorer-studio.genlayer.com/address/0x503Cd4D2f88520c1f8a6455cC958199508789817) |
+| **GenLayer Studio** (current) | `0x6A21dc70A225dD2179F0E0EE96E0eFF7210E27f7` | v6.1 · schema 4 (Anchored Proof — mandatory) | [view contract ↗](https://explorer-studio.genlayer.com/address/0x6A21dc70A225dD2179F0E0EE96E0eFF7210E27f7) |
 
 The frontend reads this from `NEXT_PUBLIC_GRUDGE_CONTRACT_ADDRESS`; redeploys
 update `apps/web/.env.local` and `contracts/deployments.json`.
@@ -29,6 +29,7 @@ the tx directly in the explorer):
 
 | Network          | Contract address                             | Version                             | Explorer                                                                                                     |
 | ---------------- | -------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| GenLayer Studio  | `0x503Cd4D2f88520c1f8a6455cC958199508789817` | v6 · schema 4 (anchored proof, optional) | [view contract ↗](https://explorer-studio.genlayer.com/address/0x503Cd4D2f88520c1f8a6455cC958199508789817)   |
 | GenLayer Studio  | `0xb9b501D7c617Cd26d93B61BA996fc67a6002379c` | v5 · schema 3 (appeals, reputation) | [view contract ↗](https://explorer-studio.genlayer.com/address/0xb9b501D7c617Cd26d93B61BA996fc67a6002379c)   |
 | Testnet Bradbury | `0x652789D1d64026026e4504D99C6B00AC269680C6` | pre-v5                              | [view contract ↗](https://explorer-bradbury.genlayer.com/address/0x652789D1d64026026e4504D99C6B00AC269680C6) |
 | Testnet Bradbury | `0xaba1Db7bfe6Ce35492497E7079ca91e6604e819C` | pre-v5                              | [view contract ↗](https://explorer-bradbury.genlayer.com/address/0xaba1Db7bfe6Ce35492497E7079ca91e6604e819C) |

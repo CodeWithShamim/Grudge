@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import { toast } from "sonner";
+import { toast } from 'sonner';
 
-import { cn } from "@/lib/utils";
-import { useAnchorInfo, useVerifyAnchor, useViewer } from "@/lib/chain/hooks";
-import type { Challenge } from "@/lib/chain/types";
-import { Button } from "./ui/Button";
+import { cn } from '@/lib/utils';
+import { useAnchorInfo, useVerifyAnchor, useViewer } from '@/lib/chain/hooks';
+import type { Challenge } from '@/lib/chain/types';
+import { Button } from './ui/Button';
 
 function anchorHost(url: string): string {
   try {
     const host = new URL(url).hostname.toLowerCase();
-    return host.startsWith("www.") ? host.slice(4) : host;
+    return host.startsWith('www.') ? host.slice(4) : host;
   } catch {
     return url;
   }
@@ -25,7 +25,7 @@ function anchorHost(url: string): string {
 export function ProofAnchor({ challenge }: { challenge: Challenge }) {
   const { address } = useViewer();
   const isCreator = challenge.creator.toLowerCase() === address.toLowerCase();
-  const needsVerify = isCreator && !challenge.anchorVerified && challenge.status === "ACTIVE";
+  const needsVerify = isCreator && !challenge.anchorVerified && challenge.status === 'ACTIVE';
   const { data: info } = useAnchorInfo(challenge.id, Boolean(challenge.proofAnchor) && needsVerify);
   const verify = useVerifyAnchor(challenge.id);
 
@@ -44,12 +44,16 @@ export function ProofAnchor({ challenge }: { challenge: Challenge }) {
         >
           {host}
         </a>
-        <span className={cn("ml-2 font-bold", challenge.anchorVerified ? "text-believe" : "text-gold")}>
-          {challenge.anchorVerified ? "⚓ ownership verified" : "⚓ unverified"}
+        <span
+          className={cn('ml-2 font-bold', challenge.anchorVerified ? 'text-believe' : 'text-gold')}
+        >
+          {challenge.anchorVerified ? '⚓ ownership verified' : '⚓ unverified'}
         </span>
       </p>
       {challenge.anchorVerified && (
-        <p className="mt-1 text-xs text-mut">Evidence for this grudge only counts if it links to {host}.</p>
+        <p className="mt-1 text-xs text-mut">
+          Evidence for this grudge only counts if it links to {host}.
+        </p>
       )}
       {needsVerify && (
         <div className="mt-3 rounded-card border border-gold/40 bg-gold/5 p-4">
@@ -57,9 +61,9 @@ export function ProofAnchor({ challenge }: { challenge: Challenge }) {
             Prove you own this account before submitting evidence
           </p>
           <p className="mt-2 text-sm text-paper/90">
-            Paste this code into the profile at{" "}
-            <span className="font-mono text-gold">{host}</span> (bio or a pinned post), then verify —
-            the validators fetch the page and check for it by consensus.
+            Paste this code into the profile at <span className="font-mono text-gold">{host}</span>{' '}
+            (Name or a pinned post), then verify — the validators fetch the page and check for it by
+            consensus.
           </p>
           {info?.code && (
             <div className="mt-2 flex items-center gap-2">
@@ -71,7 +75,7 @@ export function ProofAnchor({ challenge }: { challenge: Challenge }) {
                 variant="ghost"
                 onClick={async () => {
                   await navigator.clipboard.writeText(info.code);
-                  toast.success("Ownership code copied");
+                  toast.success('Ownership code copied');
                 }}
               >
                 Copy
