@@ -21,7 +21,23 @@ const SECTIONS = [
   { id: "verdicts", label: "Verdicts & disputes" },
   { id: "payouts", label: "Stakes & payouts" },
   { id: "contract", label: "Contract reference" },
+  { id: "roadmap", label: "Roadmap" },
   { id: "faq", label: "FAQ" },
+] as const;
+
+/**
+ * Previous deployments, kept live so the team can inspect earlier transactions
+ * at any time. Historical record — the ACTIVE contract always comes from
+ * NEXT_PUBLIC_GRUDGE_CONTRACT_ADDRESS (see contracts/deployments.json).
+ */
+const PREVIOUS_DEPLOYMENTS = [
+  {
+    address: "0xb9b501D7c617Cd26d93B61BA996fc67a6002379c",
+    explorer:
+      "https://explorer-studio.genlayer.com/address/0xb9b501D7c617Cd26d93B61BA996fc67a6002379c",
+    label: "GenLayer Studio · v5 (schema 3)",
+    note: "appeals · reputation · explain_verdict",
+  },
 ] as const;
 
 function useScrollSpy(ids: readonly string[]): string {
@@ -58,25 +74,57 @@ function Lead({ children }: { children: React.ReactNode }) {
   return <p className="text-mut">{children}</p>;
 }
 
-/** Deployed-contract address + explorer link (hidden in mock mode). */
+/** One deployed-contract row: address + explorer link. */
+function AddressCard({
+  label,
+  address,
+  href,
+  note,
+  current,
+}: {
+  label: string;
+  address: string;
+  href: string;
+  note?: string;
+  current?: boolean;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
+        "flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card border bg-ink-soft px-4 py-3 font-mono text-xs transition-colors",
+        current ? "border-ink-line hover:border-gold/50" : "border-ink-line/60 opacity-80 hover:opacity-100 hover:border-mut/60",
+      )}
+      title={`View ${address} on the GenLayer explorer`}
+    >
+      <span className="flex items-center gap-2 uppercase tracking-widest text-mut">
+        <span className={cn("h-1.5 w-1.5 rounded-full", current ? "bg-gold" : "bg-mut")} />
+        {label}
+      </span>
+      <span className="text-paper">{address}</span>
+      {note && <span className="text-mut">{note}</span>}
+      <span className={current ? "text-gold" : "text-mut"}>on GenLayer Explorer ↗</span>
+    </a>
+  );
+}
+
+/** Current deployment + previous contracts (hidden in mock mode). */
 function ContractAddressCard() {
   const address = grudgeContractAddress();
   if (!address) return null;
   return (
-    <a
-      href={explorerAddressUrl(address)}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card border border-ink-line bg-ink-soft px-4 py-3 font-mono text-xs transition-colors hover:border-gold/50"
-      title={`View ${address} on the GenLayer explorer`}
-    >
-      <span className="flex items-center gap-2 uppercase tracking-widest text-mut">
-        <span className="h-1.5 w-1.5 rounded-full bg-gold" />
-        Deployed contract
-      </span>
-      <span className="text-paper">{address}</span>
-      <span className="text-gold">on GenLayer Explorer ↗</span>
-    </a>
+    <div className="space-y-2">
+      <AddressCard label="Deployed contract" address={address} href={explorerAddressUrl(address)} current />
+      {PREVIOUS_DEPLOYMENTS.map((d) => (
+        <AddressCard key={d.address} label="Previous" address={d.address} href={d.explorer} note={d.note} />
+      ))}
+      <p className="font-sans text-xs text-mut">
+        Previous contracts stay live on-chain — open one in the explorer to re-check any earlier
+        transaction. The app itself always talks to the current contract.
+      </p>
+    </div>
   );
 }
 
@@ -315,6 +363,55 @@ result = gl.eq_principle_prompt_comparative(
                   ))}
                 </tbody>
               </table>
+            </div>
+          </Section>
+
+          <Section id="roadmap" title="Roadmap">
+            <Lead>
+              Where GRUDGE is headed. Shipped work is live on the current contract; the rest is in
+              flight or planned.
+            </Lead>
+            <div className="space-y-3">
+              {[
+                {
+                  phase: "Shipped",
+                  tone: "text-believe",
+                  items: [
+                    "Hardened contract: bounded views, solvency bookkeeping, reentrancy-guarded claim (v1–v4)",
+                    "Appeals with bonds, AI-designed evidence policies, explain_verdict, conviction ratings (v5)",
+                    "Anchored Proof: registered proof sources, on-chain ownership verification, host-gated evidence, proof-period time windows (v6)",
+                  ],
+                },
+                {
+                  phase: "Next",
+                  tone: "text-gold",
+                  items: [
+                    "Anchored-challenge UI polish: badge states, verification error recovery, explorer deep-links",
+                    "Settled-challenge payout breakdown and claim history",
+                    "Multi-anchor support — more than one proof source per grudge",
+                    "Public testnet (Asimov) deployment",
+                  ],
+                },
+                {
+                  phase: "Later",
+                  tone: "text-mut",
+                  items: [
+                    "Lightweight indexer for profile and leaderboard reads",
+                    "Notifications: proof-period reminders and settle alerts",
+                    "Challenge templates and social share cards",
+                    "Mainnet deployment with real-GEN economics review",
+                  ],
+                },
+              ].map(({ phase, tone, items }) => (
+                <div key={phase} className="rounded-card border border-ink-line bg-ink-soft p-5">
+                  <p className={cn("font-mono text-xs font-bold uppercase tracking-widest", tone)}>{phase}</p>
+                  <ul className="mt-3 ml-5 list-disc space-y-1.5 text-sm text-mut marker:text-gold">
+                    {items.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
           </Section>
 

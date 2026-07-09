@@ -1,12 +1,47 @@
 [
   {
     "contract": "grudge.py",
+    "network": "studionet",
+    "chainId": 61999,
+    "rpc": "https://studio.genlayer.com/api",
+    "explorer": "https://explorer-studio.genlayer.com",
+    "address": "0x503Cd4D2f88520c1f8a6455cC958199508789817",
+    "deployedAt": "2026-07-09",
+    "schemaVersion": 4,
+    "status": "current",
+    "notes": "v6 Anchored Proof (F5): verify_anchor + get_anchor_code, create_challenge gained proof_anchor param"
+  },
+  {
+    "contract": "grudge.py",
+    "network": "studionet",
+    "chainId": 61999,
+    "rpc": "https://studio.genlayer.com/api",
+    "explorer": "https://explorer-studio.genlayer.com",
+    "address": "0xb9b501D7c617Cd26d93B61BA996fc67a6002379c",
+    "deployedAt": "2026-06-15",
+    "schemaVersion": 3,
+    "status": "previous",
+    "notes": "v5 (appeals, reputation, explain_verdict, suggest_evidence_policy) — kept live so the team can test pre-v6 transactions"
+  },
+  {
+    "contract": "grudge.py",
+    "network": "testnet-bradbury",
+    "chainId": 4221,
+    "rpc": "https://rpc-bradbury.genlayer.com",
+    "explorer": "https://explorer-bradbury.genlayer.com",
+    "address": "0x652789D1d64026026e4504D99C6B00AC269680C6",
+    "status": "previous",
+    "notes": "Bradbury deployment referenced by the .env.local rollback block"
+  },
+  {
+    "contract": "grudge.py",
     "network": "testnet-bradbury",
     "chainId": 4221,
     "rpc": "https://rpc-bradbury.genlayer.com",
     "explorer": "https://explorer-bradbury.genlayer.com",
     "address": "0xaba1Db7bfe6Ce35492497E7079ca91e6604e819C",
     "deployedAt": "2026-06-11",
+    "status": "previous",
     "verified": "get_open_challenges read OK via gen_call"
   }
 ]

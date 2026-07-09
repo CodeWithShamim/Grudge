@@ -80,7 +80,7 @@ export default function DocsPage() {
           description:
             "Stake on a promise, let doubters bet against you, and let GenLayer validator consensus settle the truth.",
           url: absoluteUrl("/docs"),
-          articleSection: ["Overview", "How it works", "Why GenLayer", "Verdicts", "Payouts", "FAQ"],
+          articleSection: ["Overview", "How it works", "Why GenLayer", "Verdicts", "Payouts", "Roadmap", "FAQ"],
         }}
       />
       <DocsView />

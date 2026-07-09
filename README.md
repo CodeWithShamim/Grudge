@@ -138,12 +138,37 @@ ships **no** auth/chain JS.
 
 ### Live deployment
 
-| Network | Contract address | Explorer |
-| --- | --- | --- |
-| **GenLayer Studio** | `0xb9b501D7c617Cd26d93B61BA996fc67a6002379c` | [view contract ↗](https://explorer-studio.genlayer.com/address/0xb9b501D7c617Cd26d93B61BA996fc67a6002379c) |
+| Network | Contract address | Version | Explorer |
+| --- | --- | --- | --- |
+| **GenLayer Studio** (current) | `0x503Cd4D2f88520c1f8a6455cC958199508789817` | v6 · schema 4 (Anchored Proof) | [view contract ↗](https://explorer-studio.genlayer.com/address/0x503Cd4D2f88520c1f8a6455cC958199508789817) |
 
 The frontend reads this from `NEXT_PUBLIC_GRUDGE_CONTRACT_ADDRESS`; redeploys
 update `apps/web/.env.local` and `contracts/deployments.json`.
+
+**Previous deployments** — kept live so the team can re-test earlier
+transactions at any time (swap `NEXT_PUBLIC_GRUDGE_CONTRACT_ADDRESS`, or open
+the tx directly in the explorer):
+
+| Network | Contract address | Version | Explorer |
+| --- | --- | --- | --- |
+| GenLayer Studio | `0xb9b501D7c617Cd26d93B61BA996fc67a6002379c` | v5 · schema 3 (appeals, reputation) | [view contract ↗](https://explorer-studio.genlayer.com/address/0xb9b501D7c617Cd26d93B61BA996fc67a6002379c) |
+| Testnet Bradbury | `0x652789D1d64026026e4504D99C6B00AC269680C6` | pre-v5 | [view contract ↗](https://explorer-bradbury.genlayer.com/address/0x652789D1d64026026e4504D99C6B00AC269680C6) |
+| Testnet Bradbury | `0xaba1Db7bfe6Ce35492497E7079ca91e6604e819C` | pre-v5 | [view contract ↗](https://explorer-bradbury.genlayer.com/address/0xaba1Db7bfe6Ce35492497E7079ca91e6604e819C) |
+
+The full record (dates, schema versions, notes) lives in
+[`contracts/deployments.json`](contracts/deployments.json). Note: storage
+layouts differ across schema versions — old contracts serve their own history,
+but the current frontend build targets schema 4.
+
+### Seed data
+
+`apps/web/scripts/seed-studionet.mjs` seeds the deployed contract with demo
+transactions (funded throwaway accounts → `create_challenge` → `stake`s), so a
+fresh deploy has live grudges to browse:
+
+```sh
+node apps/web/scripts/seed-studionet.mjs        # reads apps/web/.env.local
+```
 
 ## Deploy to GenLayer
 
@@ -207,6 +232,28 @@ header, exactly one `gl.Contract`, storable state, public decorators, no state
 mutation in views, nondet calls only inside `gl.eq_principle_*` closures, no
 storage writes in nondet blocks, no banned imports, and
 `json.dumps(..., sort_keys=True)` for all LLM JSON. CI runs all jobs on every PR.
+
+## Roadmap
+
+**Shipped**
+
+- ✅ v1–v4 — hardened contract: bounded paginated views, solvency bookkeeping (`total_locked` + `_assert_solvent`), reentrancy-guarded `claim`, deterministic time
+- ✅ v5 — appeals with bonds, AI-designed evidence policies, `explain_verdict`, on-chain conviction rating
+- ✅ v6 — **Anchored Proof**: registered proof-source URLs, on-chain ownership verification (`verify_anchor` via web-fetch consensus), host-gated evidence links, proof-period time windows in the judge prompt
+
+**Next**
+
+- [ ] Full frontend polish for anchored challenges (anchor badge states, verification error recovery, explorer deep-links)
+- [ ] Settled-challenge payout breakdown UI (per-staker shares from `settle`, claim history)
+- [ ] Multi-anchor support — register more than one proof source per challenge (e.g. Strava + X)
+- [ ] Public testnet (Asimov) deployment once the network's LLM + web-fetch consensus is stable for our prompts
+
+**Later**
+
+- [ ] Lightweight indexer for profile/leaderboard reads (chain stays the source of truth; today they're derived client-side)
+- [ ] Notifications: proof-period reminders and settle alerts for stakers
+- [ ] Challenge templates + social share cards for common commitment types
+- [ ] Mainnet deployment + real-GEN economics review (rake, appeal bond sizing)
 
 ## Tech stack
 

@@ -18,6 +18,19 @@ before/around the LLM judgment instead of being left to it.
 > a parameter. `SCHEMA_VERSION` bumped **3 → 4**. After deploying, update
 > `NEXT_PUBLIC_GRUDGE_CONTRACT_ADDRESS`.
 
+### Deployed — 2026-07-09
+
+- **GenLayer Studio: [`0x503Cd4D2f88520c1f8a6455cC958199508789817`](https://explorer-studio.genlayer.com/address/0x503Cd4D2f88520c1f8a6455cC958199508789817)** (schema 4). `apps/web/.env.local`, `contracts/deployments.json`, and the README deployment table all point here.
+- Previous deployments stay referenced (README + `deployments.json` + commented `.env.local` block) so the team can re-test earlier transactions: Studio v5 `0xb9b501…379c`, Bradbury `0x652789…80C6` / `0xaba1Db…819C`.
+- New `apps/web/scripts/seed-studionet.mjs` seeds the fresh contract with demo transactions (funded throwaway accounts → `create_challenge` → `stake`s) so the ledger isn't empty on first load.
+
+### Frontend integration (landed 2026-07-09, commit `87f3d32`)
+
+- `GrudgeClient` gained `getAnchorInfo` / `verifyAnchor` (genlayer + mock adapters), with `AnchorInfoSchema` in `types.ts` and `useAnchorInfo` / `useVerifyAnchor` hooks.
+- New `ProofAnchor` component: anchor badge + the creator's verify flow (shows the `grudge-<id>-<addr>` code to paste, fires `verify_anchor`, which is on the slow AI-writes poll path since it runs a web-fetch consensus round).
+- Create wizard: optional "Proof source URL" field wired through `create_challenge`'s new `proof_anchor` arg; `EvidenceTribunal` blocks evidence submission until an anchored grudge is verified.
+- `judgePrompt.ts` mirrors the contract's new TIME WINDOW / ANCHORED PROOF prompt blocks so the mock judge matches on-chain behavior; mock client tests extended to cover the anchor origin gate.
+
 ### Added — contract methods (ABI deltas)
 
 | Method | Kind | Signature → returns |
